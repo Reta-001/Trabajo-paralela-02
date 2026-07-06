@@ -1,0 +1,17 @@
+# === Datos y carga ===
+pandas
+numpy
+
+# === Procesamiento paralelo / grandes volúmenes ===
+dask[dataframe]
+
+# === Estadística y tests ===
+scipy
+statsmodels
+
+# === Visualización ===
+matplotlib
+seaborn
+
+# === Machine Learning (split train/test, métricas, StandardScaler) ===
+scikit-learn

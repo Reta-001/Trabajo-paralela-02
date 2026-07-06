@@ -1,0 +1,36 @@
+# Archivos de caché y compilados de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+ENV/
+
+# Datos (ignorar datasets pesados pero conservar data/README.md)
+data/*
+!data/README.md
+
+# Reportes y logs generados
+*.log
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# Configuraciones de editores / IDEs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db
+desktop.ini
+# Archivos temporales y de scratch locales
+_*.py
