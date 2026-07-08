@@ -12,18 +12,23 @@ pip install -r requirements.txt
 
 ## Datos de entrada
 
-Descargar `ventas_completas.csv.gz` desde el enlace indicado en `bitacora.md` y guardarlo en
-`data/`, o bien indicar su ruta al ejecutar el programa.
+Descargar el archivo desde el enlace indicado en `bitacora.md` y guardarlo en la carpeta `data/`. 
+
+**Soporte Dual (.csv / .csv.gz):** El sistema está diseñado para ser transparente respecto a la compresión. Funciona exactamente igual si proporcionas el archivo original comprimido (`ventas_completas.csv.gz`) o si tu sistema operativo lo descomprimió automáticamente al descargarlo (`ventas_completas.csv`). El script detectará el formato y lo procesará en paralelo de todas formas.
 
 ## Ejecución
 
-El archivo de ventas se carga por línea de comandos:
+El archivo de ventas se carga por línea de comandos, aceptando cualquier formato:
 
 ```bash
+# Si el archivo está comprimido:
 python main.py data/ventas_completas.csv.gz
+
+# Si el archivo se descomprimió automáticamente:
+python main.py data/ventas_completas.csv
 ```
 
-Si se omite el argumento, se usa `data/ventas_completas.csv.gz` por defecto.
+Si se omite el argumento, el sistema intentará buscar `data/ventas_completas.csv.gz` por defecto.
 
 ### Reproducibilidad
 

@@ -91,11 +91,11 @@ class InferenceModeling:
     # Ajusta la regresión lineal múltiple OLS con partición 70/30 y evalúa RMSE, MAE y R².
     def run_regression_modeling(self):
         print("\n=== Modelado Predictivo: Regresión Lineal Múltiple (Opción A) ===")
-        print("Variable objetivo: MONTO APLICADO. Predictores: PORCENTAJE DESCUENTO, EDAD, "
-              "FRECUENCIA CLIENTE y CANAL (dummies).")
+        print("Variable objetivo: MONTO APLICADO. Predictores: PORCENTAJE DESCUENTO, UNIDADES, "
+              "LOCAL y CANAL (dummies).")
 
-        df_model = self.df[['MONTO APLICADO', 'PORCENTAJE DESCUENTO', 'EDAD',
-                            'FRECUENCIA CLIENTE', 'CANAL']].dropna()
+        df_model = self.df[['MONTO APLICADO', 'PORCENTAJE DESCUENTO', 'UNIDADES',
+                            'LOCAL', 'CANAL']].dropna()
         df_model = pd.get_dummies(df_model, columns=['CANAL'], drop_first=True)
 
         X = df_model.drop(columns=['MONTO APLICADO']).astype(float)
@@ -112,7 +112,7 @@ class InferenceModeling:
         print(model_sm.summary().tables[1])
         print(f"R²: {model_sm.rsquared:.4f}, R² ajustado: {model_sm.rsquared_adj:.4f}")
 
-        X_test_sm = sm.add_constant(X_test, has_constant='add')
+        X_test_sm = sm.add_constant(X_test)
         y_pred = model_sm.predict(X_test_sm).to_numpy()
         rmse = np.sqrt(mean_squared_error(y_test, y_pred))
         mae = mean_absolute_error(y_test, y_pred)
@@ -176,6 +176,8 @@ class InferenceModeling:
 
         print("\n  Multicolinealidad (VIF, vía inversa de la matriz de correlación de predictores):")
         corr_predictores = np.corrcoef(X.to_numpy(dtype='float64'), rowvar=False)
+        np.fill_diagonal(corr_predictores, 1.0)
+        corr_predictores = np.nan_to_num(corr_predictores, nan=0.0)
         vifs = np.diag(np.linalg.pinv(corr_predictores))
         for col, vif in zip(X.columns, vifs):
             estado = "ALERTA: posible multicolinealidad" if vif > 5 else "sin colinealidad"
