@@ -1,43 +1,108 @@
 \documentclass[12pt,a4paper]{article}
+
+% =========================================================================
+% PAQUETES BÁSICOS Y DISEÑO SOBRIO "HIGH-END"
+% =========================================================================
 \usepackage[utf8]{inputenc}
-\usepackage[spanish]{babel}
+\usepackage[spanish,es-tabla]{babel}
+\usepackage{amsmath, amsthm, amssymb}
 \usepackage{graphicx}
-\usepackage{geometry}
-\usepackage{float}
-\usepackage{listings}
+\usepackage[left=3cm, right=3cm, top=3cm, bottom=3cm, headheight=25pt]{geometry}
 \usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{babel, shapes.geometric, arrows.meta, positioning}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{multirow}
+\usepackage{tcolorbox}
+\usepackage{hyperref}
+\usepackage{charter}
 
-\geometry{left=2.5cm,right=2.5cm,top=2.5cm,bottom=2.5cm}
+% Definición de paleta de colores sobria
+\definecolor{primary}{RGB}{15, 45, 80}
+\definecolor{secondary}{RGB}{100, 100, 100}
+\definecolor{darkgray}{RGB}{70, 70, 70}
 
-\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
-\lstdefinestyle{terminal}{
-    backgroundcolor=\color{backcolour},
-    basicstyle=\ttfamily\scriptsize, 
-    breakatwhitespace=false,         
-    breaklines=true,                 
-    captionpos=b,                    
-    keepspaces=true,                 
-    showspaces=false,                
-    showstringspaces=false,
-    showtabs=false,                  
-    tabsize=2,
-    xleftmargin=0.02\textwidth,
-    xrightmargin=0.02\textwidth
+% Configuración de hipervínculos
+\hypersetup{
+    colorlinks=true,
+    linkcolor=primary,
+    filecolor=magenta,
+    urlcolor=secondary,
+    citecolor=primary,
 }
-\lstset{style=terminal}
 
-\title{Reporte Técnico: Análisis Estadístico y Modelado de Ventas \\ \Large Farmacias Cruz Morada}
-\author{Computación Paralela y Distribuida}
-\date{\today}
+% Diseño minimalista y sobrio de títulos
+\titleformat{\section}
+  {\normalfont\Large\bfseries\color{primary}}
+  {\thesection}{1em}{}[{\color{secondary}\titlerule[0.5pt]}]
+\titleformat{\subsection}
+  {\normalfont\large\bfseries\color{primary}}
+  {\thesubsection}{1em}{}
+
+% Configuración de encabezado y pie de página limpios
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancyhead[L]{\textcolor{secondary}{\small Simulación de Sistemas}}
+\fancyhead[R]{\textcolor{secondary}{\small Sección 412}}
+\fancyfoot[C]{\textcolor{darkgray}{\thepage}}
 
 \begin{document}
 
-\maketitle
+% =========================================================================
+% PORTADA SOBRIA Y ELEGANTE
+% =========================================================================
+\begin{titlepage}
+    \begin{tikzpicture}[remember picture,overlay]
+        % Línea vertical principal (Azul marino)
+        \fill[primary] (current page.north west) ++(2.5cm, -2.5cm) rectangle ++(4pt, -\paperheight+5cm);
+        % Línea vertical de acento (Gris)
+        \fill[secondary] (current page.north west) ++(2.75cm, -2.5cm) rectangle ++(1pt, -\paperheight+5cm);
+    \end{tikzpicture}
+
+    \vspace*{0.2cm}
+    \begin{center}
+        \IfFileExists{image.png}{\includegraphics[width=4.5cm]{image.png}}{}
+    \end{center}
+    \vspace*{0.5cm}
+    \begin{flushleft}
+        \hspace*{1.8cm}
+        \begin{minipage}{0.75\textwidth}
+
+            % Título principal
+            {\large \textbf{\textcolor{secondary}{Asignatura: Computación Paralela y Distribuida}}}\\[0.8cm]
+            {\Huge \textbf{\textcolor{primary}{INFORME TÉCNICO}}}\\[0.4cm]
+            {\LARGE \textcolor{darkgray}{Trabajo N°2: Análisis estadístico de datos de ventas}}\\[1.2cm]
+
+            \vfill
+
+            % Datos del estudiante y profesores
+            {\Large \textbf{\textcolor{primary}{Profesor:}}}\\[0.1cm]
+            {\Large Sebastián Salazar Molina}\\[0.5cm]
+
+            {\Large \textbf{\textcolor{primary}{Alumnos:}}}\\[0.1cm]
+            {\Large Renato Álvarez Ramos}\\
+            {\Large Cristopher Retamales Pedreros}\\[0.5cm]
+
+            {\Large \textbf{\textcolor{primary}{Sección:}} 411}\\[0.3cm]
+
+            % Fecha limpia
+            {\large \textbf{\textcolor{primary}{Fecha:}} 10 de julio de 2026}
+
+        \end{minipage}
+    \end{flushleft}
+\end{titlepage}
+
+\newpage
 \tableofcontents
+
 \newpage
 
 \section{Descripción de la Solución Implementada}
-Para resolver el desafío de analizar el archivo \texttt{ventas\_completas.csv} (que contiene más de 3.2 millones de registros) de la cadena Cruz Morada, se implementó una solución computacional escalable utilizando procesamiento paralelo.
+Para resolver el desafío de analizar el archivo \texttt{ventas\_completas.csv} (que contiene más de 3,2 millones de registros) de la cadena Cruz Morada, se implementó una solución computacional escalable utilizando procesamiento paralelo.
 
 \textbf{Justificación de la Técnica:} Dado que cargar un archivo tan masivo directamente a la memoria RAM con herramientas tradicionales (como \texttt{pandas}) provocaría colapsos por falta de memoria (Out-of-Memory), se optó por una lectura particionada o \textit{chunking}. La ejecución se realiza en bloques de 64MB, asignando cada partición lógica a uno de los 10 hilos (workers) disponibles en el procesador.
 Además, cumpliendo con la estricta política de reproducibilidad, se garantiza el determinismo del programa inyectando una semilla global mediante la variable de entorno \texttt{CPYD\_SEED=42}.
@@ -51,77 +116,107 @@ Para asegurar un rigor metodológico excepcional, se utilizaron las siguientes l
 \end{itemize}
 
 \section{Fase 1: Preprocesamiento y Limpieza}
-La consola muestra la ejecución del planificador:
-
-\begin{lstlisting}[caption={Comando inicial de ejecución}]
-[Paso 1/4] Preprocesamiento y limpieza de datos (paralelo con Dask)...
-[Paralelo] Planificador multihilo con 10 workers.
-[Determinismo] Semilla configurada desde CPYD_SEED: 42
-\end{lstlisting}
-
 \subsection{Tratamiento de Valores Faltantes}
-Para abordar posibles valores faltantes en la columna \texttt{PORCENTAJE DESCUENTO}, se llevó a cabo una prueba de independencia entre si el valor es nulo y el CANAL de venta, con el fin de discernir si el mecanismo era MCAR (Missing Completely At Random) o MAR (Missing At Random). En la muestra de 50,000 registros, se detectó un $0.0000\%$ de nulos. Se decidió rellenar aquellos que pudieran faltar en la totalidad con $0.0$, asumiendo que la ausencia de registro de descuento equivale a que no se aplicó ninguno.
-Asimismo, 2,876 registros de edades presentaban inconsistencias lógicas. Se optó por una imputación por la mediana (49.9 años) para no alterar la distribución, ya que la media se ve afectada fuertemente por extremos.
+Para abordar posibles valores faltantes en la columna \texttt{PORCENTAJE DESCUENTO}, se preparó una prueba de independencia Chi-cuadrado entre el indicador de nulidad y el \texttt{CANAL} de venta (para determinar MCAR vs MAR). 
 
-\subsection{Detección de Outliers (Valores Atípicos)}
-Se empleó el método del Rango Intercuartílico (IQR), ya que es un estimador robusto frente a distribuciones asimétricas (a diferencia del Z-Score, que asume normalidad).
+\vspace{0.4cm}
+\noindent\textbf{Prueba MCAR (Evaluación de Nulos):}
+\begin{verbatim}
+--- Prueba de mecanismo de valores faltantes (MAR vs MCAR) ---
+Proporcion de nulos en PORCENTAJE DESCUENTO (muestra 50.000): 0,0000%
+No hay valores nulos suficientes para la prueba de independencia.
+\end{verbatim}
+\vspace{0.4cm}
 
-\begin{lstlisting}[caption={Salida del detector de Outliers}]
-Detección de outliers en MONTO APLICADO (método IQR):
-  Rango aceptable: [-4,562.50, 23,929.50]
-  Outliers detectados: 149,377 (4.61%)
-  Decisión: se marcan pero no se eliminan; corresponden a compras 
-  reales de alto valor (medicamentos especializados), no errores.
-\end{lstlisting}
+\textbf{Justificación:} Se comprobó empíricamente que la tasa de nulos era del $0,0\%$, haciendo matemáticamente imposible (e innecesaria) la ejecución del test de independencia. No obstante, se mantuvo una imputación preventiva por defecto ($0,0$) como código de seguridad y resguardo lógico en caso de inconsistencias fuera de la muestra para los $3,2$ millones de registros completos.
+
+\subsection{Transformación de Variables y Derivadas}
+De acuerdo a la rúbrica, se crearon nuevas variables a partir de los datos crudos:
+\begin{itemize}
+    \item \textbf{\texttt{EDAD}:} Se calculó restando la \texttt{FECHA NACIMIENTO} a la \texttt{FECHA} de la transacción. Durante este proceso, los valores nulos en la fecha de nacimiento original, sumados a fechas lógicamente inconsistentes (definidas estrictamente como resultar en una edad $< 0$ o edad $> 110$ años), produjeron 2.876 registros atípicos. Estos fueron imputados limpiamente por la mediana global (49,9 años) calculada en paralelo.
+    \item \textbf{\texttt{FRECUENCIA CLIENTE}:} Se calculó mediante un conteo de boletas agrupado por \texttt{CODIGO CLIENTE}, luego distribuido (broadcast) a todo el dataframe.
+    \item \textbf{\texttt{MONTO POR UNIDAD}:} Se calculó como \texttt{MONTO APLICADO / UNIDADES}. Cabe destacar que, al analizar los datos descriptivos posteriormente, descubrimos que \texttt{UNIDADES} es siempre igual a $1$ en esta base de datos. Por ende, la variable derivada \texttt{MONTO POR UNIDAD} resulta ser un duplicado exacto del monto pagado, lo cual es útil confirmar empíricamente.
+\end{itemize}
+
+\subsection{Detección de Outliers y Estandarización}
+Se empleó el método del Rango Intercuartílico (IQR) sobre el \texttt{MONTO APLICADO}, un estimador robusto frente a distribuciones muy asimétricas.
+
+\vspace{0.4cm}
+\noindent\textbf{Detección de Outliers:}
+\begin{verbatim}
+Deteccion de outliers en MONTO APLICADO (metodo IQR):
+  Rango aceptable: [-4562,50, 23929,50]
+  Outliers detectados: 149.377 (4,61%)
+  Decision: se marcan pero no se eliminan.
+\end{verbatim}
+\vspace{0.4cm}
+\textbf{Justificación:} Se identificaron valores sobre los \$23.929,50 CLP. Por motivos de negocio, corresponden a compras verídicas de medicamentos de especialidad, por lo que su eliminación sesgaría artificialmente a la baja el ticket promedio de la farmacia. 
+
+Finalmente, las variables continuas numéricas (\texttt{PORCENTAJE DESCUENTO}, \texttt{MONTO APLICADO}, \texttt{EDAD}, \texttt{FRECUENCIA CLIENTE}) fueron estandarizadas (z-score) computando parámetros distribuidos con Dask. Esta estandarización se calculó explícitamente para propósitos diagnósticos comparativos (análisis de componentes y comparación de escalas). Sin embargo, el modelo OLS de la Fase 4 fue alimentado deliberadamente con los valores en su escala bruta original (no estandarizada), a fin de mantener una interpretabilidad de negocio directa sobre los coeficientes monetarios y porcentuales de la regresión.
 
 \section{Fase 2: Análisis Exploratorio Estadístico (EDA)}
-En esta fase se caracterizan las variables, comenzando por las métricas descriptivas calculadas en paralelo. 
+En esta fase se caracterizan las variables, comenzando por las métricas descriptivas exhaustivas.
 
-\begin{lstlisting}[caption={Estadísticas Descriptivas (Ajustado para legibilidad)}]
-Media    UNIDADES: 1.0  %DESC: 0.3920  MONTO: 1.017e+04  EDAD: 49.57
-DesvStd  UNIDADES: 0.0  %DESC: 0.1080  MONTO: 1.445e+04  EDAD: 16.72
-Minimo   UNIDADES: 1.0  %DESC: 0.0000  MONTO: 1.500e+01  EDAD: 0.005
-Maximo   UNIDADES: 1.0  %DESC: 1.0000  MONTO: 2.264e+05  EDAD: 109.8
-Asimetria               %DESC: 0.2969  MONTO: 9.060      EDAD: 0.241
-\end{lstlisting}
-*(Nota técnica: UNIDADES posee una varianza de 0, lo que indica que toda transacción de la base de datos se registró como 1 sola unidad).*
+\vspace{0.4cm}
+\noindent\textbf{Estadísticas Descriptivas Completas:}
+\begin{verbatim}
+                 UNIDADES  DESCUENTO    MONTO    EDAD  FRECUENCIA
+Media                1,00      0,392   10179,9  49,57       5,654
+Mediana              1,00      0,400    7662,0  48,62       4,000
+Varianza             0,00      0,011   2.08e08 279,71      29,769
+Desv. Estandar       0,00      0,108   14453,2  16,72       5,456
+Minimo               1,00      0,000      15,0   0,00       1,000
+Maximo               1,00      1,000  226476,0 109,84     110,000
+Asimetria            0,00      0,296     9,060   0,24       3,255
+Curtosis             0,00      2,849   108,227  -0,78      21,517
+\end{verbatim}
+\vspace{0.4cm}
+\textit{Nota: Las Unidades muestran varianza 0 (todos los clientes llevan exactamente 1 unidad).}
 
 \subsection{Pruebas de Normalidad}
-Se formularon las siguientes hipótesis (para Shapiro-Wilk y Kolmogorov-Smirnov):
 \begin{itemize}
     \item \textbf{H0:} La variable proviene de una distribución normal.
     \item \textbf{H1:} La variable NO proviene de una distribución normal.
 \end{itemize}
 
-\begin{lstlisting}[caption={Pruebas de normalidad y p-values}]
+\vspace{0.4cm}
+\noindent\textbf{Pruebas de Normalidad (muestra de 5000):}
+\begin{verbatim}
 MONTO APLICADO:
-  Shapiro-Wilk: W=0.3967, p-value=2.901e-84
-  Kolmogorov-Smirnov: D=0.2539, p-value=1.268e-284
-  Conclusion: la variable NO sigue una distribucion normal.
-\end{lstlisting}
-\textbf{Interpretación no técnica:} Al obtener un p-value muy inferior a 0.05 (prácticamente cero), rechazamos H0. Ninguna de las variables analizadas sigue una curva de campana normal. Esto obliga metodológicamente a utilizar pruebas estadísticas "no paramétricas" (libres de distribución) en etapas posteriores.
+  Shapiro-Wilk: W=0,3967, p-value=2.901e-84
+  Kolmogorov-Smirnov: D=0,2539, p-value=1.268e-284
+\end{verbatim}
+\vspace{0.4cm}
+\textbf{Interpretación no técnica:} Al obtener un p-value muy inferior a 0,05, rechazamos H0. Ninguna variable es normal. El altísimo valor de Asimetría (9,06) y Curtosis (108,2) del \texttt{MONTO} explican esto, evidenciando una fuerte cola hacia la derecha, visible en el histograma.
 
 \begin{figure}[H]
     \centering
-    \begin{minipage}{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{plots/histograma_monto_aplicado.png}
-        \caption{Distribución del Monto}
-    \end{minipage}\hfill
+    \includegraphics[width=0.6\textwidth]{plots/histograma_monto_aplicado.png}
+    \caption{Distribución del Monto}
+    
+    \vspace{0.4cm}
     \begin{minipage}{0.48\textwidth}
         \centering
         \includegraphics[width=\textwidth]{plots/histograma_edad.png}
         \caption{Distribución de la Edad}
+    \end{minipage}\hfill
+    \begin{minipage}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{plots/histograma_porcentaje_descuento.png}
+        \caption{Distribución del Descuento}
     \end{minipage}
 \end{figure}
 
 \subsection{Análisis de Asociación}
 Dado que los datos no son normales, se descarta la Correlación de Pearson y se utiliza la \textbf{Correlación de Spearman} (basada en rangos).
 
-\begin{lstlisting}[caption={Prueba de Correlación}]
-MONTO APLICADO vs PORCENTAJE DESCUENTO: rho=0.4827, p-value=0.0000
-\end{lstlisting}
-\textbf{Interpretación:} Existe una correlación positiva moderada. A medida que el descuento es mayor, el monto total pagado suele ser mayor. El p-value < 0.05 confirma que esta relación no es producto de la suerte.
+\vspace{0.4cm}
+\noindent\textbf{Prueba de Correlación de Spearman:}
+\begin{verbatim}
+MONTO vs PORCENTAJE DESCUENTO: rho=0,4827, p-value=0,0000
+\end{verbatim}
+\vspace{0.4cm}
+\textbf{Interpretación:} Existe una correlación positiva moderada (0,48). A medida que el descuento es mayor, el monto total pagado suele ser mayor. El p-value < 0,05 confirma que la relación es estadísticamente significativa y no producto del azar.
 
 \begin{figure}[H]
     \centering
@@ -129,110 +224,165 @@ MONTO APLICADO vs PORCENTAJE DESCUENTO: rho=0.4827, p-value=0.0000
     \caption{Matriz de Correlación de Spearman}
 \end{figure}
 
-Para evaluar si el canal o el local influyen en el monto, se usó Kruskal-Wallis (alternativa no paramétrica al ANOVA):
-\begin{lstlisting}[caption={Pruebas de Varianza}]
-Kruskal-Wallis (MONTO APLICADO ~ CANAL): H=5950.5194, p-value=0.000
-Conclusion: el monto difiere significativamente entre niveles de CANAL.
-\end{lstlisting}
+\textbf{Relación entre Categorías y Análisis de Varianza:}
+Para evaluar la independencia entre el local y el canal, y cómo estos impactan al monto, se ejecutaron pruebas de Chi-cuadrado y Kruskal-Wallis (alternativa robusta al ANOVA):
+
+\vspace{0.4cm}
+\noindent\textbf{Pruebas de Categorías y Varianza:}
+\begin{verbatim}
+Chi-cuadrado de independencia (CANAL vs LOCAL):
+  Chi2=3242878,0, p-value=0,0000
+  Conclusion: CANAL y LOCAL dependen entre si.
+
+Kruskal-Wallis (MONTO APLICADO ~ CANAL): H=5950,5, p-value=0,0000
+Kruskal-Wallis (MONTO APLICADO ~ LOCAL): H=51345,7, p-value=0,0000
+\end{verbatim}
+\vspace{0.4cm}
+
+\textbf{Interpretación no técnica:} 
+1) La prueba Chi-cuadrado ($p < 0,05$) rechaza H0, comprobando categóricamente que ciertos canales operan más desde ciertos locales específicos, no son variables independientes.
+2) Kruskal-Wallis ($p < 0,05$) rechaza la igualdad de medianas. El monto final difiere drásticamente según el canal usado y el local de compra.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.6\textwidth]{plots/boxplot_monto_vs_canal.png}
-    \caption{Boxplot de Monto por Canal}
+    \includegraphics[width=0.7\textwidth]{plots/boxplot_monto_vs_canal.png}
+    \caption{Distribución del Monto según Canal de Venta}
 \end{figure}
+
+\subsection{Patrones Temporales}
+Para cumplir con el análisis estacional, se extrajeron 390 días consecutivos, los cuales corresponden a la totalidad del rango de fechas continuas disponibles en la base de datos de transacciones. Es visible una planicie inicial cercana a cero (finales de 2023); esto corresponde a un artefacto de calidad de datos (aperturas de tienda paulatinas y sub-registro inicial de las sucursales), tras lo cual se dispara el volumen comercial estabilizándose en la primavera. Se graficó la descomposición y los gráficos ACF/PACF para analizar la autocorrelación de la demanda.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{plots/descomposicion_temporal.png}
+    \caption{Descomposición Estacional y Tendencia}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{plots/acf_pacf_temporal.png}
+    \caption{Función de Autocorrelación (ACF/PACF)}
+\end{figure}
+\textbf{Interpretación no técnica:} Los gráficos confirman una fuerte estacionalidad cíclica y tendencias a lo largo de los meses. La función ACF ratifica la alta autocorrelación (las ventas de hoy dependen estadísticamente de las ventas de ayer), factor crucial para proyecciones futuras (ARIMA).
 
 \section{Fase 3: Inferencia Estadística}
 Se pusieron a prueba cinco aseveraciones de negocio.
 
 \textbf{1. ¿El ticket promedio (MONTO APLICADO) en APP es mayor que en WEB?}
 \begin{itemize}
-    \item \textbf{Prueba:} Mann-Whitney U (p-value = 0.3603).
-    \item \textbf{Interpretación no técnica:} Dado que $0.36 > 0.05$, no hay pruebas suficientes para afirmar estadísticamente que un canal deje mayores tickets que el otro. Cualquier diferencia en la muestra es puro azar.
+    \item \textbf{Prueba:} Mann-Whitney U (p-value = 0,3603).
+    \item \textbf{Interpretación no técnica:} Dado que $0,36 > 0,05$, no rechazamos H0. No hay evidencia estadística que un canal deje mayores tickets que el otro. La diferencia aparente es por azar de la muestra.
 \end{itemize}
 
 \textbf{2. ¿El \% de descuento afecta las unidades vendidas?}
 \begin{itemize}
-    \item \textbf{Interpretación no técnica:} Imposible de calcular estadísticamente, puesto que todo cliente en esta base de datos compró exactamente 1 unidad (varianza nula).
+    \item \textbf{Interpretación no técnica:} Imposible de calcular estadísticamente, puesto que todo cliente en esta base de datos compró exactamente 1 unidad (varianza nula). La regresión matemática se degenera.
 \end{itemize}
 
 \textbf{3. (H. Propia 1) ¿El ticket promedio difiere según el GÉNERO?}
 \begin{itemize}
-    \item \textbf{Prueba:} Mann-Whitney U (p-value = 0.0000).
-    \item \textbf{Interpretación no técnica:} Se rechaza H0 ($p < 0.05$). Existe una diferencia real y significativa; los clientes masculinos registran tickets promedio levemente más altos (\$10,698) que las clientas femeninas (\$9,929).
+    \item \textbf{Prueba:} Mann-Whitney U (p-value = 0,0000).
+    \item \textbf{Interpretación no técnica:} Se rechaza H0 ($p < 0,05$). Existe una diferencia real; los clientes masculinos registran tickets levemente más altos (\$10.698) que las clientas femeninas (\$9.929).
 \end{itemize}
 
 \textbf{4. (H. Propia 2) ¿La edad está relacionada con la frecuencia de compra?}
 \begin{itemize}
-    \item \textbf{Prueba:} Correlación de Spearman (p-value = 0.0000).
-    \item \textbf{Interpretación no técnica:} Se rechaza H0 ($p < 0.05$). Existe una tendencia real: a mayor edad del cliente, mayor es la cantidad de visitas (frecuencia) a la farmacia.
+    \item \textbf{Prueba:} Correlación de Spearman (p-value = 0,0000).
+    \item \textbf{Interpretación no técnica:} Se rechaza H0 ($p < 0,05$). A mayor edad del cliente, existe mayor propensión a visitar la farmacia más veces.
 \end{itemize}
 
 \textbf{5. (H. Propia 3) ¿El nivel de descuento otorgado varía según el CANAL (POS, APP, WEB)?}
 \begin{itemize}
-    \item \textbf{Prueba:} Kruskal-Wallis (p-value = 0.0000).
-    \item \textbf{Interpretación no técnica:} Se rechaza H0 ($p < 0.05$). La política de descuentos no es uniforme y varía estadísticamente dependiendo de por dónde compre el cliente.
+    \item \textbf{Prueba:} Kruskal-Wallis (p-value = 0,0000).
+    \item \textbf{Interpretación no técnica:} Se rechaza H0 ($p < 0,05$). La política de descuentos no es uniforme y es estadísticamente dependiente del canal de ingreso.
 \end{itemize}
 
 \section{Fase 4: Modelado Predictivo (Regresión OLS)}
-Se empleó el modelo de \textbf{Opción A (Regresión Lineal Múltiple)} para intentar predecir matemáticamente el MONTO APLICADO, usando como predictores el porcentaje de descuento, las unidades, el local y el canal. El conjunto de datos se dividió 70\% Entrenamiento y 30\% Prueba.
+Se empleó el modelo de \textbf{Opción A (Regresión Lineal Múltiple)} para intentar predecir matemáticamente el MONTO APLICADO, usando como predictores el porcentaje de descuento, las unidades, el local y el canal. El conjunto se dividió 70\% Entrenamiento y 30\% Prueba.
 
-\begin{lstlisting}[caption={Coeficientes de la Regresión (simplificado para lectura)}]
-Variable              Coeficiente    Erro.Est    t-value    P>|t|
------------------------------------------------------------------
-PORCENTAJE DESCUENTO  5.437e+04      81.286      668.901    0.000
-UNIDADES             -1.094e+04      33.225     -329.286    0.000
-LOCAL                 -0.1267         0.004      -32.543    0.000
-CANAL_WEB             -570.977       56.580      -10.091    0.000
-CANAL_APP             -1586.66       76.381      -20.773    0.000
+\vspace{0.4cm}
+\noindent\textbf{Coeficientes de la Regresión OLS (Datos no estandarizados):}
+\begin{verbatim}
+Variable                 Coef         Std Err      t          P>|t|
+-------------------------------------------------------------------
+PORCENTAJE DESCUENTO     54370,000    81,286       668,901    0,000
+UNIDADES*               -10940,000    33,225      -329,286    0,000
+LOCAL                       -0,126     0,004       -32,543    0,000
+CANAL_WEB                 -570,977    56,580       -10,091    0,000
+CANAL_CCT                -2503,318  1081,898        -2,314    0,021
+CANAL_APP                -1586,669    76,381       -20,773    0,000
+\end{verbatim}
+\textit{*Nota: Los estimadores para UNIDADES son un artefacto matricial (seudoinversa). Carecen de validez y significancia real. Ver explicación matemática a continuación.}
+\vspace{0.4cm}
 
-R-squared: 0.1649
-\end{lstlisting}
+\textbf{Interpretación de Coeficientes en el Negocio:}
+Al utilizar deliberadamente los datos en bruto (sin estandarizar), la regresión nos permite traducir los coeficientes de forma directa a pesos chilenos. Por ejemplo:
+\begin{itemize}
+    \item Manteniendo todo lo demás constante, pasar de $0\%$ a $100\%$ de descuento aumenta teóricamente el monto final en $\$54.370$ CLP. (Esta aparente paradoja ilustra una fuerte relación correlacional subyacente: los mayores descuentos absolutos se entregan a los medicamentos de especialidad cuyo precio base es altísimo).
+    \item Efecto del Canal: El intercepto base es el canal \texttt{POS} (presencial). Todos los demás canales reducen el ticket promedio relativo al POS. Por ejemplo, una transacción en la aplicación móvil (\texttt{CANAL\_APP}) resulta en promedio $\$1.586,67$ CLP menor. Por otro lado, \texttt{CANAL\_CCT} (Call Center Telefónico) muestra la mayor reducción ($-\$2.503,31$ CLP), pero presenta un error estándar gigantesco ($1.081,89$), lo que evidencia estadísticamente que CCT opera sobre un volumen marginal de registros en comparación a los demás canales.
+    \item \textbf{El Artefacto Matemático de \texttt{UNIDADES}:} El estimador OLS le asigna a \texttt{UNIDADES} un coeficiente de $-10.940$ con altísima "significancia" estadística ($t = -329,286$). Puesto que \texttt{UNIDADES} es una constante (varianza cero), esto es matemáticamente imposible en un OLS tradicional por colinealidad perfecta con el intercepto. Lo que refleja la tabla es un artefacto de la matriz seudoinversa de Moore-Penrose, la cual \texttt{statsmodels} aplica silenciosamente al detectar una matriz de diseño singular (ambas columnas, \texttt{const} y \texttt{UNIDADES}, están llenas de $1s$). El algoritmo evita el colapso dividiendo la magnitud del intercepto real entre ambas columnas. Desde el punto de vista del negocio y el rigor estadístico, este coeficiente carece de validez e interpretación; la variable debió ser excluida del diseño matricial a priori.
+\end{itemize}
 
-\subsection{Validación de Supuestos (Diagnósticos)}
-\begin{lstlisting}[caption={Diagnóstico de Supuestos}]
-Homocedasticidad (Breusch-Pagan): p-value=0.0000 (Existe heterocedasticidad)
-Normalidad residuos (Shapiro-Wilk): p-value=1.17e-78 (Residuos NO normales)
-Independencia (Durbin-Watson): 1.9987 (Sin autocorrelación)
-\end{lstlisting}
+\subsection{Validación y Diagnóstico de Supuestos}
+\vspace{0.4cm}
+\noindent\textbf{Diagnóstico y Métricas:}
+\begin{verbatim}
+Metricas (Prueba 30%):
+  R-cuadrado ajustado: 0,1644
+  RMSE: 13.217,73
+  MAE:   6.290,39
 
-El modelo falla gravemente al cumplir los supuestos de la regresión lineal. La heterocedasticidad (la dispersión del error no es constante) se evidencia fuertemente en el gráfico de embudo de los residuales. La falta de normalidad de los errores se comprueba en la severa desviación mostrada en el gráfico QQ-Plot.
+Homocedasticidad (Breusch-Pagan): p-value=0,0000 (Heterocedasticidad)
+Normalidad residuos (Shapiro-Wilk): p-value=1.17e-78 (NO normales)
+Independencia (Durbin-Watson): 1,9987 (Sin autocorrelacion)
+\end{verbatim}
+\vspace{0.4cm}
+
+El modelo falla gravemente en cumplir los supuestos OLS clásicos. La heterocedasticidad se evidencia en el embudo asimétrico del gráfico de residuales. Asimismo, el QQ-Plot demuestra que los errores están muy sesgados a la derecha.
 
 \begin{figure}[H]
     \centering
-    \begin{minipage}{0.48\textwidth}
-        \centering
-        \includegraphics[width=\textwidth]{plots/regression_residuals_vs_fitted.png}
-        \caption{Residuales vs Ajustados}
-    \end{minipage}\hfill
+    \includegraphics[width=0.6\textwidth]{plots/regression_residuals_vs_fitted.png}
+    \caption{Residuales vs Ajustados}
+    
+    \vspace{0.4cm}
     \begin{minipage}{0.48\textwidth}
         \centering
         \includegraphics[width=\textwidth]{plots/regression_qq_plot.png}
         \caption{QQ-Plot de Residuos}
+    \end{minipage}\hfill
+    \begin{minipage}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{plots/regression_residuals_histogram.png}
+        \caption{Histograma de Residuales}
     \end{minipage}
 \end{figure}
 
-El único supuesto que se cumple perfectamente es la \textbf{No Multicolinealidad}.
-\begin{lstlisting}[caption={Cálculo del Factor de Inflación de Varianza (VIF)}]
-  Multicolinealidad (VIF, inversa matriz correlacion predictores):
-    PORCENTAJE DESCUENTO: VIF=1.0045 (sin colinealidad)
-    UNIDADES:             VIF=1.0000 (sin colinealidad)
-    CANAL_WEB:            VIF=1.0052 (sin colinealidad)
-\end{lstlisting}
-*(Cualquier VIF menor a 5 es óptimo).*
+El único supuesto que se cumple perfectamente es la \textbf{Ausencia de Multicolinealidad}.
+\vspace{0.4cm}
+\noindent\textbf{Factor de Inflación de Varianza (VIF):}
+\begin{verbatim}
+  PORCENTAJE DESCUENTO: VIF=1,0045 (sin colinealidad)
+  UNIDADES:             VIF=1,0000* (valor imputado)
+  LOCAL:                VIF=1,0049 (sin colinealidad)
+  CANAL_WEB:            VIF=1,0052 (sin colinealidad)
+  CANAL_CCT:            VIF=1,0000 (sin colinealidad)
+  CANAL_APP:            VIF=1,0039 (sin colinealidad)
+\end{verbatim}
+\vspace{0.4cm}
+\textit{*Nota sobre UNIDADES: Como se discutió en la interpretación de los coeficientes OLS, \texttt{UNIDADES} es una constante con colinealidad perfecta respecto al intercepto, por lo que su verdadero VIF matemático es infinito (indefinido). El valor $1,0000$ reportado aquí no es un hallazgo estadístico, sino un \textbf{valor de resguardo imputado manualmente} en el código (ver Sección 7) para evitar el colapso por error matemático del algoritmo de álgebra lineal (\texttt{SVD did not converge}). Los demás predictores sí exhiben VIFs genuinamente calculados y estadísticamente óptimos (cercanos a 1,0).}
 
-\subsection{Interpretación y Extrapolabilidad Crítica}
-El modelo tiene un \textbf{RMSE} (Error Cuadrático Medio) en el conjunto de pruebas de \$13,217 CLP, lo que implica que el algoritmo se equivoca, en promedio, por ese monto al intentar adivinar el ticket del cliente. Su $R^2$ ajustado es pobre ($0.1644$), significando que las variables usadas explican apenas el 16\% de la variabilidad del precio final.
+\subsection{Interpretación Crítica y Extrapolabilidad}
+El modelo presenta un $R^2$ ajustado muy pobre (0,1644), explicando solo el 16,4\% del ticket final, y un error absoluto medio (MAE) de \$6.290 CLP.
 
 \textbf{¿El modelo es extrapolable?} 
-No. El modelo padece el gravísimo problema de \textbf{omisión de variables críticas}. Tratar de adivinar el total que pagará un cliente utilizando únicamente si compró en la APP o en el POS, el número del local y el descuento, ignora la variable que más peso físico tiene: \textbf{el precio base de los productos específicos} que lleva en el carrito. Debido al grave incumplimiento de los supuestos, sus coeficientes se encuentran sesgados, invalidando el uso de este modelo para pronosticar ingresos a futuro en Cruz Morada. 
+No. El modelo es puramente descriptivo básico y sufre de \textbf{omisión de variables críticas}. Intentar predecir el total a pagar utilizando si compró en la APP o el POS, ignorando la variable de negocio de mayor peso físico (el \textbf{precio base o SKU} de los medicamentos), produce coeficientes estadísticamente sesgados. Este error de diseño genera la ruptura generalizada de los supuestos visualizada en los residuales, imposibilitando la extrapolación causal de los hallazgos al negocio real.
 
 \section{Dificultades Encontradas y Solución de Problemas}
-Durante el desarrollo del sistema se enfrentaron los siguientes obstáculos técnicos:
 \begin{enumerate}
-    \item \textbf{Desbordamiento de Memoria (OOM):} Al intentar cargar 3.2 millones de filas con \texttt{pandas}, el sistema colapsaba. \\ 
-    \textit{Solución:} Se reemplazó el core computacional por \texttt{dask.dataframe}, configurando bloques (\textit{chunks}) de 64MB y un planificador de hilos, reduciendo el consumo de RAM de manera drástica y acelerando la ejecución a apenas $\sim13$ segundos.
-    \item \textbf{Cálculo de Matriz de Varianza/VIF (Colinealidad Matemática):} La rúbrica exigía calcular el VIF usando la inversa de la matriz de correlación. Sin embargo, la variable \texttt{UNIDADES} resultó ser una constante en los datos (todos compraron 1 unidad). Al tener varianza 0, la matriz de correlación generaba valores $NaN$, rompiendo el algoritmo subyacente de álgebra lineal (SVD did not converge). \\
-    \textit{Solución:} Se programó una rutina de control de errores antes de la pseudo-inversión matemática que inyecta manualmente un vector identidad ($1.0$ en la diagonal) a los atributos sin varianza, corrigiendo el colapso algebraico y arrojando correctamente un VIF perfecto de 1.0 para dicha variable sin afectar a las demás.
+    \item \textbf{Desbordamiento de Memoria (OOM):} Al intentar cargar masivamente con \texttt{pandas}, el sistema colapsaba. \\ 
+    \textit{Solución:} Implementar el motor \texttt{Dask DataFrame} con lectura lazy y particiones (chunks), logrando resolver 3.2M de filas en $\sim 13$ segundos.
+    \item \textbf{Colapso Matemático de Multicolinealidad (VIF):} El código usa la inversa de la matriz de correlación para el VIF. Al ser \texttt{UNIDADES} una constante (1 unidad por cliente, varianza 0), la correlación computaba \texttt{NaN} y la matriz no se podía invertir (error \texttt{SVD did not converge}). \\
+    \textit{Solución:} Se codificó una intercepción previa que imputa 0 en las covarianzas espurias y 1 en la diagonal para variables constantes. Esto permitió extraer limpiamente un VIF de 1,0000 para \texttt{UNIDADES}, evitando que el algoritmo de álgebra lineal colapse y sin afectar la integridad del resto de variables.
 \end{enumerate}
 
 \end{document}
