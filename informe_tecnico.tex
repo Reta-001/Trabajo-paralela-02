@@ -4,7 +4,7 @@
 % PAQUETES BÁSICOS Y DISEÑO SOBRIO "HIGH-END"
 % =========================================================================
 \usepackage[utf8]{inputenc}
-\usepackage[spanish,es-tabla]{babel}
+\usepackage[spanish,es-tabla,es-noshorthands]{babel}
 \usepackage{amsmath, amsthm, amssymb}
 \usepackage{graphicx}
 \usepackage[left=3cm, right=3cm, top=3cm, bottom=3cm, headheight=25pt]{geometry}
@@ -380,7 +380,7 @@ No. El modelo es puramente descriptivo básico y sufre de \textbf{omisión de va
 \section{Dificultades Encontradas y Solución de Problemas}
 \begin{enumerate}
     \item \textbf{Desbordamiento de Memoria (OOM):} Al intentar cargar masivamente con \texttt{pandas}, el sistema colapsaba. \\ 
-    \textit{Solución:} Implementar el motor \texttt{Dask DataFrame} con lectura lazy y particiones (chunks), logrando resolver 3.2M de filas en $\sim 13$ segundos.
+    \textit{Solución:} Implementar el motor \texttt{Dask DataFrame} con lectura lazy y particiones (chunks), logrando resolver 3,2M de filas en $\sim 13$ segundos.
     \item \textbf{Colapso Matemático de Multicolinealidad (VIF):} El código usa la inversa de la matriz de correlación para el VIF. Al ser \texttt{UNIDADES} una constante (1 unidad por cliente, varianza 0), la correlación computaba \texttt{NaN} y la matriz no se podía invertir (error \texttt{SVD did not converge}). \\
     \textit{Solución:} Se codificó una intercepción previa que imputa 0 en las covarianzas espurias y 1 en la diagonal para variables constantes. Esto permitió extraer limpiamente un VIF de 1,0000 para \texttt{UNIDADES}, evitando que el algoritmo de álgebra lineal colapse y sin afectar la integridad del resto de variables.
 \end{enumerate}
