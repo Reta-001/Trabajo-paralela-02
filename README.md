@@ -41,9 +41,11 @@ CPYD_SEED=42 python main.py data/ventas_completas.csv.gz
 
 ## Carga y manejo de memoria
 
-El archivo se procesa con **Dask DataFrame** en modo de evaluación diferida (lazy) con
-planificador multihilo: los workers comparten memoria, evitando la duplicación del intérprete
-de Python y la serialización entre procesos. Optimizaciones aplicadas:
+El archivo se procesa con **Dask DataFrame** en modo de evaluación diferida (lazy). El
+planificador es configurable; el **valor por defecto es `threads`** (multihilo, memoria
+compartida), que resultó ser el más rápido y estable para esta carga *memory-bound* según la
+evaluación empírica documentada en el informe (`threads` 1,27×, `processes` 0,34× por sobrecosto
+de IPC bajo `spawn`, `LocalCluster` óptimo en régimen estacionario). Optimizaciones aplicadas:
 
 - **Descompresión única en caché**: gzip no es divisible por bloques, por lo que el `.gz` se
   descomprime una sola vez a disco; las ejecuciones siguientes leen el CSV plano directamente.
@@ -63,10 +65,14 @@ de bajo consumo, y carga completa con pandas para conjuntos pequeños.
 ```text
 ├── main.py                     # Orquestador: CLI, semilla, pipeline completo
 ├── requirements.txt
-├── bitacora.md                 # Enunciado y checklist del trabajo
-├── INFORME_TECNICO.md          # Informe técnico con resultados e interpretaciones
+├── informe_tecnico.tex         # Informe técnico (LaTeX) con resultados e interpretaciones
+├── benchmark.py                # Benchmark de planificadores: integridad, determinismo, sweep
+├── benchmark_advanced.py       # LocalCluster vs processes + descomposición por sub-fase
+├── sysinfo.py                  # Captura de hardware/entorno (reproducibilidad)
+├── run_benchmarks.sh           # Orquestador de sysinfo + benchmark avanzado
 ├── data/                       # Archivo de ventas (no versionado)
 ├── plots/                      # Gráficos generados por el pipeline
+├── bench_results/              # Salidas de benchmark (JSON + logs) usadas en el informe
 └── src/
     ├── data_loader.py          # Carga eficiente: pandas completo, chunks y Dask
     ├── parallel_processor.py   # Motor paralelo: particiones, limpieza, estadísticos

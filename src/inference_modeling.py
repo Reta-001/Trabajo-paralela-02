@@ -13,6 +13,8 @@ from sklearn.model_selection import train_test_split
 from statsmodels.stats.diagnostic import het_breuschpagan
 from statsmodels.stats.stattools import durbin_watson
 
+from src.utils import kruskal_eta2, rank_biserial, effect_label as _effect_label
+
 
 # Inferencia estadística (5 pruebas de hipótesis) y modelado por regresión lineal múltiple.
 class InferenceModeling:
@@ -44,6 +46,9 @@ class InferenceModeling:
         u_stat, u_p = stats.mannwhitneyu(monto_app, monto_web, alternative='greater')
         print(f"  T-test de Welch (unilateral): t={t_stat:.4f}, p-value={t_p:.6e}")
         print(f"  Mann-Whitney U (no paramétrico): U={u_stat:.4f}, p-value={u_p:.6e}")
+        rbc_h1 = rank_biserial(u_stat, len(monto_app), len(monto_web))
+        print(f"  Tamaño de efecto (rango-biserial): r={rbc_h1:.4f} "
+              f"(magnitud {_effect_label(abs(rbc_h1), 'r')})")
         print(f"  {self._verdict(u_p)}")
 
         print("\nHipótesis 2: el % de descuento afecta significativamente las unidades vendidas.")
@@ -66,17 +71,27 @@ class InferenceModeling:
         monto_f = self.df.loc[self.df['GENERO'] == 2, 'MONTO APLICADO'].dropna()
         print(f"  Media Masculino: {monto_m.mean():,.2f} (N={len(monto_m):,})")
         print(f"  Media Femenino: {monto_f.mean():,.2f} (N={len(monto_f):,})")
-        t_gen, p_gen = stats.ttest_ind(monto_m, monto_f, equal_var=False)
-        u_gen, pu_gen = stats.mannwhitneyu(monto_m, monto_f)
-        print(f"  T-test de Welch: t={t_gen:.4f}, p-value={p_gen:.6e}")
-        print(f"  Mann-Whitney U: U={u_gen:.4f}, p-value={pu_gen:.6e}")
-        print(f"  {self._verdict(p_gen)}")
+        t_gen_std_valid = monto_m.std() > 0 and monto_f.std() > 0
+        if not t_gen_std_valid:
+            print("  T-test / Mann-Whitney: degenerate test — zero variance en los grupos de GÉNERO.")
+        else:
+            t_gen, p_gen = stats.ttest_ind(monto_m, monto_f, equal_var=False)
+            u_gen, pu_gen = stats.mannwhitneyu(monto_m, monto_f)
+            print(f"  T-test de Welch: t={t_gen:.4f}, p-value={p_gen:.6e}")
+            print(f"  Mann-Whitney U: U={u_gen:.4f}, p-value={pu_gen:.6e}")
+            rbc_gen = rank_biserial(u_gen, len(monto_m), len(monto_f))
+            print(f"  Tamaño de efecto (rango-biserial): r={rbc_gen:.4f} "
+                  f"(magnitud {_effect_label(abs(rbc_gen), 'r')})")
+            print(f"  {self._verdict(p_gen)}")
 
         print("\nHipótesis propia 2: la edad y la frecuencia de compra están monotónicamente asociadas.")
         par = self.df[['EDAD', 'FRECUENCIA CLIENTE']].dropna()
-        rho, p_rho = stats.spearmanr(par['EDAD'], par['FRECUENCIA CLIENTE'])
-        print(f"  Spearman: rho={rho:.4f}, p-value={p_rho:.6e}")
-        print(f"  {self._verdict(p_rho)}")
+        if par['EDAD'].std() == 0 or par['FRECUENCIA CLIENTE'].std() == 0:
+            print("  Spearman: degenerate test — zero variance en EDAD o FRECUENCIA CLIENTE.")
+        else:
+            rho, p_rho = stats.spearmanr(par['EDAD'], par['FRECUENCIA CLIENTE'])
+            print(f"  Spearman: rho={rho:.4f}, p-value={p_rho:.6e}")
+            print(f"  {self._verdict(p_rho)}")
 
         print("\nHipótesis propia 3: el descuento promedio varía según el CANAL de compra.")
         subset = self.df[['CANAL', 'PORCENTAJE DESCUENTO']].dropna()
@@ -84,18 +99,30 @@ class InferenceModeling:
                   for _, g in subset.groupby('CANAL', observed=True) if len(g) > 1]
         f_stat, p_f = stats.f_oneway(*groups)
         h_stat, p_h = stats.kruskal(*groups)
+        n_total = sum(len(g) for g in groups)
+        eta2_h3 = kruskal_eta2(h_stat, len(groups), n_total)
         print(f"  ANOVA: F={f_stat:.4f}, p-value={p_f:.6e}")
         print(f"  Kruskal-Wallis: H={h_stat:.4f}, p-value={p_h:.6e}")
+        print(f"  Tamaño de efecto (eta^2): {eta2_h3:.4f} "
+              f"(magnitud {_effect_label(eta2_h3, 'eta2')})")
         print(f"  {self._verdict(p_h)}")
 
     # Ajusta la regresión lineal múltiple OLS con partición 70/30 y evalúa RMSE, MAE y R².
     def run_regression_modeling(self):
         print("\n=== Modelado Predictivo: Regresión Lineal Múltiple (Opción A) ===")
-        print("Variable objetivo: MONTO APLICADO. Predictores: PORCENTAJE DESCUENTO, UNIDADES, "
-              "LOCAL y CANAL (dummies).")
+        print("Variable objetivo: MONTO APLICADO.")
+        print("Predictores: PORCENTAJE DESCUENTO (continua) y CANAL (categórica, dummies).")
+        print("EXCLUSIONES JUSTIFICADAS:")
+        print("  - UNIDADES: constante (varianza 0), perfectamente colineal con el")
+        print("    intercepto; incluirla es inválido (artefacto de seudoinversa).")
+        print("  - LOCAL: identificador NOMINAL de alta cardinalidad (792 locales) y,")
+        print("    además, ESTRUCTURALMENTE COLINEAL con CANAL: los canales online")
+        print("    (WEB/APP/CCT) se registran en un único local virtual (LOCAL 1999),")
+        print("    por lo que incluir CANAL y LOCAL juntos vuelve SINGULAR la matriz de")
+        print("    diseño. Su efecto categórico se caracteriza en el EDA (Kruskal por LOCAL).")
 
-        df_model = self.df[['MONTO APLICADO', 'PORCENTAJE DESCUENTO', 'UNIDADES',
-                            'LOCAL', 'CANAL']].dropna()
+        # Modelo interpretable y no singular: MONTO ~ DESCUENTO + CANAL.
+        df_model = self.df[['MONTO APLICADO', 'PORCENTAJE DESCUENTO', 'CANAL']].dropna().copy()
         df_model = pd.get_dummies(df_model, columns=['CANAL'], drop_first=True)
 
         X = df_model.drop(columns=['MONTO APLICADO']).astype(float)
@@ -178,7 +205,14 @@ class InferenceModeling:
         corr_predictores = np.corrcoef(X.to_numpy(dtype='float64'), rowvar=False)
         np.fill_diagonal(corr_predictores, 1.0)
         corr_predictores = np.nan_to_num(corr_predictores, nan=0.0)
-        vifs = np.diag(np.linalg.pinv(corr_predictores))
-        for col, vif in zip(X.columns, vifs):
-            estado = "ALERTA: posible multicolinealidad" if vif > 5 else "sin colinealidad"
-            print(f"    {col}: VIF={vif:.4f} ({estado})")
+        try:
+            vifs = np.diag(np.linalg.inv(corr_predictores))
+            for col, vif in zip(X.columns, vifs):
+                estado = "ALERTA: posible multicolinealidad" if vif > 5 else "sin colinealidad"
+                print(f"    {col}: VIF={vif:.4f} ({estado})")
+        except np.linalg.LinAlgError:
+            print("    ALERTA: Matriz singular detectada. Multicolinealidad perfecta presente.")
+            # For back-compatibility with the UNIDADES=1.0 placeholder behavior,
+            # we do not fallback to pinv here for the main VIFs to avoid masking other issues.
+            for col in X.columns:
+                print(f"    {col}: VIF=indefinido (Matriz Singular)")

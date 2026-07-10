@@ -1,0 +1,37 @@
+{
+  "platform": "macOS-26.5.1-arm64-arm-64bit",
+  "system": "Darwin",
+  "machine": "arm64",
+  "processor": "arm",
+  "python_version": "3.11.15",
+  "python_impl": "CPython",
+  "mp_start_method": "spawn",
+  "mp_cpu_count": 10,
+  "os_cpu_count": 10,
+  "macos": {
+    "chip_brand": "Apple M4",
+    "hw_model": "Mac16,12",
+    "physical_cpu": "10",
+    "logical_cpu": "10",
+    "perf_cores_P": "4",
+    "efficiency_cores_E": "6",
+    "ram_bytes": "17179869184",
+    "ram_gb": 16.0,
+    "page_size": "16384"
+  },
+  "sw_vers": {
+    "ProductName": "macOS",
+    "ProductVersion": "26.5.1",
+    "BuildVersion": "25F80"
+  },
+  "libraries": {
+    "dask": "2026.7.0",
+    "distributed": "2026.7.0",
+    "pandas": "3.0.3",
+    "numpy": "2.4.6",
+    "scipy": "1.17.1",
+    "statsmodels": "0.14.6",
+    "sklearn": "1.9.0",
+    "psutil": "7.2.2"
+  }
+}

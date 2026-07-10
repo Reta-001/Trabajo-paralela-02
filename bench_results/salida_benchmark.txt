@@ -1,0 +1,58 @@
+================================================================================
+                    BENCHMARK DE RENDIMIENTO DEL PIPELINE
+================================================================================
+Archivo: data/ventas_completas.csv
+Semilla: 42
+Runs por configuración: 3  (1 warmup descartado + 3 cronometrados, warm-cache)
+Timer: time.perf_counter()
+Equipo: Apple M4 (10 núcleos: 4P+6E), 16 GB RAM, macOS 26.5.1, spawn
+Modelo OLS verificado: MONTO ~ DESCUENTO + CANAL (UNIDADES y LOCAL excluidos)
+
+  scheduler='synchronous':  total ~22,6 s  (prep=19,4-19,8  eda~1,9  inf~0,6  ols~0,5)
+  scheduler='threads':      total ~18,4 s  (prep=15,3-15,6  eda~1,9  inf~0,6  ols~0,4)
+  scheduler='processes':    total ~63,9 s  (prep=60,8-61,1  eda~1,9  inf~0,6  ols~0,4)
+
+================================================================================
+                      RESULTADOS DE BENCHMARK  (media +/- std, s)
+================================================================================
+Fase                    │ Dask-paralela? │ synchronous     │ threads         │ processes       │ Speedup(proc)
+Load+Preprocess (Dask)  │ YES            │ 19.61 ± 0.14    │ 15.40 ± 0.14    │ 60.98 ± 0.15    │ 0.32x
+EDA (pandas/scipy)      │ NO             │  1.92 ± 0.03    │  1.91 ± 0.03    │  1.91 ± 0.01    │ 1.00x
+Inference (scipy)       │ NO             │  0.61 ± 0.00    │  0.62 ± 0.00    │  0.63 ± 0.00    │ 0.98x
+OLS (statsmodels)       │ NO             │  0.48 ± 0.02    │  0.43 ± 0.01    │  0.40 ± 0.01    │ 1.20x
+TOTAL                   │ MIXED          │ 22.62 ± 0.11    │ 18.36 ± 0.14    │ 63.92 ± 0.16    │ 0.35x
+
+Speedup (T_synchronous / T_parallel):  threads = 1.27x   processes = 0.32x
+
+================================================================================
+                    VERIFICACIÓN DE INTEGRIDAD DE RESULTADOS
+================================================================================
+scheduler='synchronous': 26 PASS, 0 FAIL, 0 MISSING
+scheduler='threads':     26 PASS, 0 FAIL, 0 MISSING
+scheduler='processes':   26 PASS, 0 FAIL, 0 MISSING
+Overall integrity (processes vs reference): PASS
+
+================================================================================
+                    VERIFICACIÓN DE DETERMINISMO
+================================================================================
+2 ejecuciones adicionales bajo scheduler='processes' con la misma semilla.
+Results: 37 identical, 0 differ
+Determinism under processes: PASS
+
+================================================================================
+                    PARTITION SIZE SWEEP (Load+Preprocess, processes)
+================================================================================
+  32MB:  72.46 / 72.24 / 71.79  ->  72.16 ± 0.28 s   (1.17x)
+  64MB:  61.63 / 61.57 / 62.23  ->  61.81 ± 0.30 s   (1.00x, óptimo)
+  128MB: 76.01 / 75.64 / 77.42  ->  76.36 ± 0.76 s   (1.24x)
+
+Integrity check (processes vs reference): PASS
+Determinism (processes, 2 runs): PASS
+
+Nota: las RuntimeWarning "invalid value encountered in scalar divide" corresponden al
+cálculo de asimetría/curtosis de UNIDADES (varianza cero -> 0/0 = NaN). Es esperado y
+manejado (se reporta NA); no afecta ninguna otra métrica.
+
+Nota: los tiempos absolutos varían ~10-15% entre sesiones por estado térmico/carga de la
+máquina; las razones de aceleración, la integridad (26/26) y el determinismo (37/37) son
+estables.

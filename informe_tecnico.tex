@@ -46,8 +46,8 @@
 \pagestyle{fancy}
 \fancyhf{}
 \renewcommand{\headrulewidth}{0.4pt}
-\fancyhead[L]{\textcolor{secondary}{\small Simulación de Sistemas}}
-\fancyhead[R]{\textcolor{secondary}{\small Sección 412}}
+\fancyhead[L]{\textcolor{secondary}{\small Computación Paralela y Distribuida}}
+\fancyhead[R]{\textcolor{secondary}{\small Sección 411}}
 \fancyfoot[C]{\textcolor{darkgray}{\thepage}}
 
 \begin{document}
@@ -104,16 +104,237 @@
 \section{Descripción de la Solución Implementada}
 Para resolver el desafío de analizar el archivo \texttt{ventas\_completas.csv} (que contiene más de 3,2 millones de registros) de la cadena Cruz Morada, se implementó una solución computacional escalable utilizando procesamiento paralelo.
 
-\textbf{Justificación de la Técnica:} Dado que cargar un archivo tan masivo directamente a la memoria RAM con herramientas tradicionales (como \texttt{pandas}) provocaría colapsos por falta de memoria (Out-of-Memory), se optó por una lectura particionada o \textit{chunking}. La ejecución se realiza en bloques de 64MB, asignando cada partición lógica a uno de los 10 hilos (workers) disponibles en el procesador.
+\textbf{Justificación de la Técnica:} Dado que cargar un archivo tan masivo directamente a la memoria RAM con herramientas tradicionales (como \texttt{pandas}) provocaría colapsos por falta de memoria (Out-of-Memory), se optó por una lectura particionada o \textit{chunking}. La ejecución se realiza en bloques de 64\,MB, asignando cada partición lógica como una tarea independiente entre los \textbf{10 núcleos lógicos} (4 de rendimiento + 6 de eficiencia) del procesador Apple M4 del equipo de pruebas. El motor paralelo expone el planificador de Dask como parámetro configurable (\texttt{synchronous}, \texttt{threads}, \texttt{processes} y \texttt{distributed}/LocalCluster); la Sección~\ref{sec:benchmark} documenta la evaluación empírica que fundamenta la elección del planificador por defecto.
 Además, cumpliendo con la estricta política de reproducibilidad, se garantiza el determinismo del programa inyectando una semilla global mediante la variable de entorno \texttt{CPYD\_SEED=42}.
+
+\textbf{Proyección de columnas (memoria y privacidad):} De las 15 columnas del archivo original, la lectura con Dask carga únicamente las 9 requeridas por el análisis (\texttt{FECHA}, \texttt{CANAL}, \texttt{UNIDADES}, \texttt{PORCENTAJE DESCUENTO}, \texttt{MONTO APLICADO}, \texttt{LOCAL}, \texttt{CODIGO CLIENTE}, \texttt{FECHA NACIMIENTO} y \texttt{GENERO}). Se descartan en la propia lectura \texttt{SKU}, \texttt{PRODUCTO}, \texttt{BOLETA}, \texttt{RUN CLIENTE}, \texttt{NOMBRES} y \texttt{APELLIDOS} por dos motivos: \textit{(i)} reducen el consumo de memoria y el tiempo de parseo, al no materializar columnas de texto pesadas ni identificadores no utilizados; y \textit{(ii)} \texttt{RUN CLIENTE}, \texttt{NOMBRES} y \texttt{APELLIDOS} son datos personales identificables, cuya exclusión minimiza el tratamiento de información sensible. El identificador \texttt{CODIGO CLIENTE} (UUID) se conserva sólo para calcular la frecuencia de compra por cliente y se elimina inmediatamente después de dicho cómputo. Adicionalmente, se declaran los tipos de dato explícitos por columna (p.\,ej. \texttt{Int32}, \texttt{Int8}, \texttt{category}, \texttt{float64}) para evitar la inferencia costosa y acotar la huella de memoria.
 
 \section{Justificación de las Librerías Estadísticas Utilizadas}
 Para asegurar un rigor metodológico excepcional, se utilizaron las siguientes librerías de Python, consideradas estándares industriales en la ciencia de datos:
 \begin{itemize}
     \item \textbf{Dask:} Utilizado para el paralelismo nativo. Es una extensión de Pandas que permite procesar \textit{dataframes} que exceden la capacidad de la memoria RAM.
     \item \textbf{SciPy (\texttt{scipy.stats}):} Se seleccionó para las pruebas de normalidad (Shapiro-Wilk, Kolmogorov-Smirnov), independencia (Chi-cuadrado) y comparación de medianas (Kruskal-Wallis, Mann-Whitney U). Provee implementaciones altamente optimizadas y matemáticamente exactas de estos contrastes de hipótesis.
-    \item \textbf{Statsmodels:} Empleado para la regresión lineal (OLS) y sus diagnósticos. A diferencia de \texttt{scikit-learn} (enfocado puramente en predicción \textit{machine learning}), \texttt{statsmodels} está diseñado explícitamente para la \textit{inferencia estadística}, ofreciendo tablas detalladas de coeficientes, p-values, errores estándar, y tests robustos (Breusch-Pagan, Durbin-Watson, VIF).
+    \item \textbf{Statsmodels:} Empleado para la regresión lineal (OLS) y sus diagnósticos. A diferencia de \texttt{scikit-learn} (enfocado puramente en predicción \textit{machine learning}), \texttt{statsmodels} está diseñado explícitamente para la \textit{inferencia estadística}, ofreciendo tablas detalladas de coeficientes, p-values, errores estándar, y tests robustos (Breusch-Pagan, Durbin-Watson, VIF). También aporta la descomposición estacional de series de tiempo y las funciones ACF/PACF.
+    \item \textbf{pandas y NumPy:} base del cómputo tabular y numérico. \texttt{pandas} provee las estructuras de datos (y respalda a Dask, que replica su API sobre particiones); \texttt{NumPy} aporta el álgebra vectorizada subyacente (incluidos los cálculos de tamaños de efecto y VIF).
+    \item \textbf{scikit-learn:} utilizado \textit{exclusivamente} para tareas de \textit{machine learning} bien acotadas donde es el estándar: la partición reproducible \texttt{train\_test\_split} (70/30 con semilla), las métricas de validación (RMSE, MAE, $R^2$) y el \texttt{StandardScaler} (z-score con parámetros documentados). La inferencia se delega a \texttt{statsmodels}, no a esta librería.
+    \item \textbf{matplotlib y seaborn:} generación de todas las visualizaciones (histogramas con densidad, boxplots, mapa de calor de correlaciones, descomposición temporal, ACF/PACF y diagnósticos de residuos). \texttt{seaborn} se usa por su integración estadística directa (KDE, \texttt{heatmap}) sobre \texttt{matplotlib}.
 \end{itemize}
+
+\section{Arquitectura Paralela y Evaluación Empírica de Rendimiento}
+\label{sec:benchmark}
+Un objetivo central del trabajo es que la solución sea \textit{eficiente y escalable}, no
+simplemente ``paralela''. Por ello, en lugar de asumir que el paralelismo garantiza aceleración,
+se sometió el motor a una evaluación empírica rigurosa que compara cuatro planificadores de Dask
+sobre la fase de carga y preprocesamiento (la única etapa efectivamente paralelizada del
+\textit{pipeline}). Los hallazgos son deliberadamente autocríticos: revelan que la elección ingenua
+del planificador puede \textbf{degradar} el rendimiento por debajo del secuencial, y que la
+aceleración real exige entender la tensión entre el \textit{GIL} de Python y el costo de la
+comunicación entre procesos (IPC).
+
+\subsection{Entorno de Ejecución y Reproducibilidad}
+Todas las mediciones se ejecutaron en un único equipo, con caché de disco tibia (\textit{warm-cache})
+y la semilla determinista \texttt{CPYD\_SEED=42}. La Tabla~\ref{tab:entorno} documenta el entorno
+exacto para garantizar la reproducibilidad de las cifras.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{ll}
+\toprule
+\textbf{Componente} & \textbf{Especificación} \\
+\midrule
+Procesador & Apple M4 (ARM64), 10 núcleos lógicos (4P + 6E) \\
+Memoria RAM & 16 GB \\
+Sistema operativo & macOS 26.5.1 (build 25F80) \\
+Intérprete & CPython 3.11.15 \\
+Arranque de \textit{multiprocessing} & \texttt{spawn} \\
+Dask / Distributed & 2026.7.0 / 2026.7.0 \\
+pandas / NumPy / SciPy & 3.0.3 / 2.4.6 / 1.17.1 \\
+statsmodels / scikit-learn & 0.14.6 / 1.9.0 \\
+Semilla determinista & \texttt{CPYD\_SEED=42} \\
+\bottomrule
+\end{tabular}
+\caption{Entorno de ejecución y versiones utilizadas en el \textit{benchmark} (reproducibilidad).}
+\label{tab:entorno}
+\end{table}
+
+\noindent\textbf{Nota sobre determinismo bajo \texttt{spawn}:} en macOS los \textit{workers} de proceso
+no heredan la semilla del proceso padre. Esto no compromete el determinismo porque las operaciones
+ejecutadas dentro de los \textit{workers} (\texttt{fillna}, \texttt{clip}, \texttt{groupby},
+\texttt{map}, \texttt{quantile}) son puramente deterministas; todo muestreo aleatorio (partición
+train/test, muestras para diagnósticos) ocurre en el proceso principal \textit{después} de
+\texttt{.compute()}, donde la semilla sí está fijada.
+
+\subsection{Metodología del \textit{Benchmark}}
+Cada configuración se midió con 1 ejecución de calentamiento (descartada) más 3 ejecuciones
+cronometradas con \texttt{time.perf\_counter()}, bloques de 64\,MB y 10 \textit{workers}. Para
+localizar el origen de los costos, cada ejecución se descompuso en cuatro sub-fases:
+\textit{(i)} construcción del pool/cluster (\textit{setup}); \textit{(ii)} carga y primera
+evaluación del grafo (\texttt{persist()}); \textit{(iii)} reducciones intermedias (mediana de edad,
+conteo de edades inválidas, límites IQR, frecuencia por cliente, estadísticos descriptivos y las dos
+tablas de contingencia MCAR: ocho invocaciones a \texttt{.compute()} en total); y \textit{(iv)}
+materialización final del \textit{dataframe} de 3,2M filas al proceso principal. En paralelo, un hilo
+muestreó la memoria máxima del sistema y los \textit{bytes} enviados a \textit{swap}, para distinguir
+un cuello de botella real de IPC de una simple presión de memoria.
+
+\subsection{Resultados: Descomposición por Sub-fase}
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{lrrrr}
+\toprule
+ & \textbf{Secuencial} & \textbf{Hilos} & \textbf{Procesos} & \textbf{LocalCluster} \\
+\textbf{Sub-fase (s)} & \texttt{synchronous} & \texttt{threads} & \texttt{processes} & \texttt{distributed} \\
+\midrule
+Configuración (\textit{setup})   & 0,00 & 0,00 & 0,00 & 2,32 \\
+Construcción del grafo           & 0,01 & 0,01 & 0,01 & 0,01 \\
+Carga + \texttt{persist()}       & 5,34 & 3,91 & 4,90 & 1,37 \\
+Reducciones intermedias          & 13,45 & 10,37 & \textbf{38,75} & 7,31 \\
+Materialización final            & 0,68 & 0,68 & \textbf{9,71} & 8,53 \\
+\midrule
+\textbf{TOTAL}                   & 19,47 & \textbf{14,97} & 53,37 & 17,23 \\
+\textit{Aceleración vs. secuencial} & 1,00$\times$ & \textbf{1,30}$\boldsymbol{\times}$ & 0,36$\times$ & 1,13$\times$ \\
+\bottomrule
+\end{tabular}
+\caption{Descomposición del tiempo de Carga+Preprocesamiento (media de 3 ejecuciones, en segundos).
+Se resaltan en \textbf{negrita} el mejor tiempo total y las sub-fases donde el planificador
+\texttt{processes} colapsa.}
+\label{tab:benchmark}
+\end{table}
+
+\noindent Consumo de recursos (peor caso entre ejecuciones): la memoria máxima del sistema osciló
+entre 5,98 y 7,08\,GB de los 16\,GB disponibles, y el envío a \textit{swap} nunca superó los
+6,8\,MB en \textbf{ninguna} configuración. Esto \textbf{descarta} que la lentitud de
+\texttt{processes} se deba a paginación por falta de memoria: el sobrecosto es genuinamente de
+serialización (IPC).
+
+\subsection{Interpretación: el dilema GIL \textit{vs.} IPC}
+\begin{itemize}
+    \item \textbf{Hilos (\texttt{threads}) — 1,30$\times$:} es el planificador más rápido y estable
+    ($\pm 0,15$\,s). La aceleración es modesta porque el \textit{GIL} de Python impide que las
+    operaciones de \texttt{pandas} (intensivas en CPU) se ejecuten simultáneamente; la ganancia
+    proviene casi por completo de la fase de E/S (descompresión y parseo del CSV), que libera el
+    \textit{GIL}. Los \textit{workers} comparten memoria, por lo que no hay costo de serialización.
+
+    \item \textbf{Procesos (\texttt{processes}) — 0,36$\times$ (regresión):} contraintuitivamente,
+    el paralelismo ``real'' resultó casi \textbf{tres veces más lento} que el baseline secuencial.
+    La descomposición localiza el problema con precisión: las \textit{reducciones intermedias} se
+    disparan de $\sim$13 a \textbf{38,75\,s} y la \textit{materialización final} de 0,68 a
+    \textbf{9,71\,s}. Bajo \texttt{spawn}, cada una de las ocho llamadas a \texttt{.compute()}
+    obliga a serializar (\textit{pickle}) los datos a través de las fronteras de proceso, y el
+    volcado final de 3,2M filas al proceso principal debe empaquetarse por completo. Como el
+    \textit{swap} es nulo, se confirma que se trata de un cuello de botella de \textbf{IPC}, no de
+    memoria.
+
+    \item \textbf{LocalCluster (\texttt{distributed}) — hasta 5$\times$ más rápido que
+    \texttt{processes}:} el planificador distribuido recupera el paralelismo por procesos. Es
+    3,10$\times$ más rápido que \texttt{processes} en promedio y alcanza $\sim$10,7\,s en régimen
+    estacionario (ejecuciones 2 y 3), es decir 1,81$\times$ sobre el baseline: el mejor resultado
+    absoluto. La clave es que construye el \textit{pool} una sola vez y \texttt{persist()} mantiene
+    las particiones \textit{residentes en los workers} (persist de 1,37\,s frente a 4,90\,s), de modo
+    que las reducciones intermedias caen a 7,31\,s, \textbf{incluso por debajo del secuencial}. Su
+    costo es un \textit{setup} de 2,32\,s y una primera materialización más costosa (la varianza alta
+    de la Tabla~\ref{tab:benchmark} proviene de la ejecución 1, con un \textit{gather} inicial de
+    21,4\,s que se estabiliza en $\sim$2,1\,s en las siguientes).
+\end{itemize}
+
+\noindent\textbf{Límite de Amdahl.} Sólo la fase de Carga+Preprocesamiento es paralelizable; el EDA,
+la inferencia y el modelado OLS son secuenciales (un ``residuo serial'' fijo de $\sim$3\,s,
+independiente del planificador). Por tanto, la aceleración global del \textit{pipeline} está acotada
+por la ley de Amdahl con independencia del número de núcleos: optimizar el preprocesamiento tiene
+rendimientos decrecientes sobre el tiempo total.
+
+\subsection{Verificación de Integridad, Determinismo y Barrido de Particiones}
+\label{sec:verificacion}
+Un segundo arnés de medición (\texttt{benchmark.py}) ejecuta el \textit{pipeline completo}
+—no sólo el preprocesamiento— bajo los tres planificadores de una sola máquina, y añade tres
+verificaciones exigidas por el rigor metodológico: integridad numérica, determinismo y el barrido
+de tamaño de partición que justifica la configuración de 64\,MB. La Tabla~\ref{tab:fullpipe} confirma
+empíricamente el argumento de Amdahl: las fases EDA, Inferencia y OLS son \textit{indistinguibles}
+entre planificadores (aceleración 0,97--1,08$\times$, es decir ruido), y sólo Carga+Preprocesamiento
+responde al planificador.
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{llrrr}
+\toprule
+\textbf{Fase} & \textbf{¿Dask-paralela?} & \textbf{\texttt{synchronous}} & \textbf{\texttt{threads}} & \textbf{\texttt{processes}} \\
+\midrule
+Carga+Preprocesamiento & Sí & 19,61 $\pm$ 0,14 & 15,40 $\pm$ 0,14 & 60,98 $\pm$ 0,15 \\
+EDA (pandas/scipy)      & No &  1,92 $\pm$ 0,03 &  1,91 $\pm$ 0,03 &  1,91 $\pm$ 0,01 \\
+Inferencia (scipy)      & No &  0,61 $\pm$ 0,00 &  0,62 $\pm$ 0,00 &  0,63 $\pm$ 0,00 \\
+OLS (statsmodels)       & No &  0,48 $\pm$ 0,02 &  0,43 $\pm$ 0,01 &  0,40 $\pm$ 0,01 \\
+\midrule
+\textbf{TOTAL}          & Mixta & \textbf{22,62 $\pm$ 0,11} & \textbf{18,36 $\pm$ 0,14} & \textbf{63,92 $\pm$ 0,16} \\
+\bottomrule
+\end{tabular}
+\caption{Tiempo del \textit{pipeline} completo por fase (media $\pm$ desv.\ de 3 ejecuciones, en
+segundos). Los tiempos absolutos difieren de la Tabla~\ref{tab:benchmark} (medida en otra sesión) por
+la variabilidad térmica/de carga de la máquina entre ejecuciones (hasta $\sim$15\%); las
+\textbf{razones de aceleración y las conclusiones son invariantes} (\texttt{threads} $\approx$1,3$\times$,
+\texttt{processes} $\approx$0,3$\times$), como también lo son la integridad y el determinismo.}
+\label{tab:fullpipe}
+\end{table}
+
+\noindent\textbf{Integridad numérica.} El arnés extrae 26 métricas del \textit{pipeline} (conteos de
+filas/outliers/clientes, estadísticos descriptivos, $p$-values, estadísticos de prueba y coeficientes
+OLS) y las contrasta contra los valores de referencia. El resultado es \textbf{26/26 coincidencias
+(0 fallos, 0 faltantes) en las tres configuraciones} de planificador, con tolerancia relativa
+$<10^{-3}$. Esto demuestra que cambiar el modelo de ejecución (secuencial, hilos o procesos) no altera
+ni un solo resultado analítico: la paralelización es correcta, no sólo rápida.
+
+\noindent\textbf{Determinismo.} Dos ejecuciones adicionales bajo \texttt{processes} con la misma semilla
+produjeron \textbf{37/37 salidas idénticas} bit a bit (0 divergencias). Esto confirma empíricamente la
+propiedad discutida en la Sección~\ref{sec:benchmark}: aunque bajo \texttt{spawn} los \textit{workers}
+no heredan la semilla, el resultado es determinista porque toda la aleatoriedad reside en el proceso
+principal tras \texttt{.compute()}.
+
+\noindent\textbf{Barrido de tamaño de partición.} Para fundamentar el valor de 64\,MB se midió la fase
+Carga+Preprocesamiento (bajo \texttt{processes}) con tres tamaños de bloque (Tabla~\ref{tab:sweep}).
+
+\begin{table}[H]
+\centering
+\small
+\begin{tabular}{lrr}
+\toprule
+\textbf{Tamaño de bloque} & \textbf{Media $\pm$ Std (s)} & \textbf{vs. 64\,MB} \\
+\midrule
+32\,MB  & 72,16 $\pm$ 0,28 & 1,17$\times$ \\
+\textbf{64\,MB}  & \textbf{61,81 $\pm$ 0,30} & \textbf{1,00$\times$ (óptimo)} \\
+128\,MB & 76,36 $\pm$ 0,76 & 1,24$\times$ \\
+\bottomrule
+\end{tabular}
+\caption{Barrido de tamaño de partición sobre Carga+Preprocesamiento (planificador \texttt{processes},
+media de 3 ejecuciones).}
+\label{tab:sweep}
+\end{table}
+
+\noindent 64\,MB es el óptimo empírico. Con 32\,MB se generan demasiadas particiones pequeñas: crece
+el sobrecosto de planificación de tareas y el número de transferencias entre procesos (de ahí también
+su alta varianza, $\pm 11,3$\,s). Con 128\,MB las particiones son pocas y grandes: se pierde granularidad
+de paralelismo y cada transferencia IPC es más voluminosa. 64\,MB equilibra ambos extremos, minimizando
+el tiempo con una varianza mínima ($\pm 0,65$\,s).
+
+\noindent\textbf{Nota sobre advertencias en pantalla.} Durante el cálculo de estadísticos descriptivos,
+\texttt{numpy} emite una \texttt{RuntimeWarning} (``\texttt{invalid value encountered in scalar divide}'')
+al computar la asimetría y curtosis de \texttt{UNIDADES}: al tener varianza cero, dichos momentos son
+$0/0 = $ NaN. Es un resultado esperado y controlado (se reporta como NA) que no afecta ninguna otra
+métrica; en \texttt{main.py} se suprime explícitamente esta advertencia benigna para mantener limpia la
+salida.
+
+\subsection{Conclusión y Planificador Seleccionado}
+Para esta carga de trabajo \textit{memory-bound} (tablas densas que caben en RAM, en una sola
+máquina de 10 núcleos), el planificador \texttt{threads} ofrece el mejor equilibrio entre velocidad
+y robustez (1,30$\times$ estable, sin sobrecosto de arranque) y es, por ello, el \textbf{planificador
+por defecto de la solución entregada}. El planificador \texttt{processes} se descarta explícitamente
+por su regresión de rendimiento. \texttt{LocalCluster} se documenta como la vía de escalamiento
+correcta: es el más rápido en régimen estacionario y sería la elección obligada si el conjunto
+excediera la memoria o se distribuyera en múltiples nodos, escenarios en los que su modelo de datos
+residentes amortiza el sobrecosto inicial. El hallazgo metodológico central es que, en Python, el
+paralelismo de datos tabulares está atrapado entre estar \textit{limitado por el GIL} (hilos) o
+\textit{limitado por IPC} (procesos ingenuos), y que sortear ese dilema exige un planificador que
+minimice el trasiego de datos entre procesos.
 
 \section{Fase 1: Preprocesamiento y Limpieza}
 \subsection{Tratamiento de Valores Faltantes}
@@ -130,6 +351,30 @@ No hay valores nulos suficientes para la prueba de independencia.
 
 \textbf{Justificación:} Se comprobó empíricamente que la tasa de nulos era del $0,0\%$, haciendo matemáticamente imposible (e innecesaria) la ejecución del test de independencia. No obstante, se mantuvo una imputación preventiva por defecto ($0,0$) como código de seguridad y resguardo lógico en caso de inconsistencias fuera de la muestra para los $3,2$ millones de registros completos.
 
+\vspace{0.4cm}
+\noindent\textbf{Prueba MCAR — FECHA NACIMIENTO:}
+\begin{verbatim}
+--- Prueba de mecanismo de valores faltantes para FECHA NACIMIENTO ---
+
+Proporción de nulos globales (muestra de 3.242.878): 0,0000%
+Tabla de contingencia (CANAL vs FECHA NACIMIENTO nulo):
+FECHA_NAC_ES_NULO        0
+CANAL                     
+APP                  43.238
+CCT                    304
+POS                3.119.349
+WEB                  79.987
+No hay valores nulos suficientes en la muestra para la prueba de independencia con CANAL.
+
+Proporción de nulos globales (muestra de 3.242.878): 0,0000%
+No hay valores nulos suficientes en la muestra para la prueba de independencia con LOCAL.
+\end{verbatim}
+\vspace{0.4cm}
+
+\textbf{Justificación:} Se evaluó la posible dependencia de los valores nulos frente a las variables \texttt{CANAL} y \texttt{LOCAL}. Al igual que con el porcentaje de descuento, se demostró mediante conteo paralelo en toda la base de datos (3.242.878 registros) que la tasa de nulos verdaderos (ausencia de registro, `NaN`) en la \texttt{FECHA NACIMIENTO} es exactamente del $0,0\%$. Dado que no existen verdaderos nulos iniciales en la columna, el test estadístico de mecanismo MCAR vs MAR/MNAR es inherentemente inaplicable por falta de varianza en la condición de nulidad. 
+
+Es imperativo distinguir conceptualmente este análisis de nulidad estructural del tratamiento de validación de dominio (outliers lógicos). Las 2.876 edades lógicamente inválidas (ej. $< 0$ o $> 110$ años) identificadas y corregidas posteriormente en la Fase 1 \textbf{no son registros nulos (missing values)} ni responden a un mecanismo de pérdida dependiente, sino a inconsistencias de digitación o fallas en sistemas heredados que contenían fechas espurias (ej. 1900-01-01). Dado que el problema original no es un fenómeno estadístico de datos faltantes, sino un problema aislado de limpieza de atípicos sobre registros que sí existían, el uso del test MCAR no aplica, y la imputación posterior vía mediana resulta en una aproximación robusta a un problema de ruido, sin el requerimiento de estratificación por canal o local.
+
 \subsection{Transformación de Variables y Derivadas}
 De acuerdo a la rúbrica, se crearon nuevas variables a partir de los datos crudos:
 \begin{itemize}
@@ -145,7 +390,7 @@ Se empleó el método del Rango Intercuartílico (IQR) sobre el \texttt{MONTO AP
 \noindent\textbf{Detección de Outliers:}
 \begin{verbatim}
 Deteccion de outliers en MONTO APLICADO (metodo IQR):
-  Rango aceptable: [-4562,50, 23929,50]
+  Rango aceptable: [-4.562,50, 23.929,50]
   Outliers detectados: 149.377 (4,61%)
   Decision: se marcan pero no se eliminan.
 \end{verbatim}
@@ -161,12 +406,12 @@ En esta fase se caracterizan las variables, comenzando por las métricas descrip
 \noindent\textbf{Estadísticas Descriptivas Completas:}
 \begin{verbatim}
                  UNIDADES  DESCUENTO    MONTO    EDAD  FRECUENCIA
-Media                1,00      0,392   10179,9  49,57       5,654
-Mediana              1,00      0,400    7662,0  48,62       4,000
+Media                1,00      0,392   10.179,9  49,57       5,654
+Mediana              1,00      0,400    7.662,0  48,62       4,000
 Varianza             0,00      0,011   2.08e08 279,71      29,769
-Desv. Estandar       0,00      0,108   14453,2  16,72       5,456
+Desv. Estandar       0,00      0,108   14.453,2  16,72       5,456
 Minimo               1,00      0,000      15,0   0,00       1,000
-Maximo               1,00      1,000  226476,0 109,84     110,000
+Maximo               1,00      1,000  226.476,0 109,84     110,000
 Asimetria            0,00      0,296     9,060   0,24       3,255
 Curtosis             0,00      2,849   108,227  -0,78      21,517
 \end{verbatim}
@@ -225,23 +470,35 @@ MONTO vs PORCENTAJE DESCUENTO: rho=0,4827, p-value=0,0000
 \end{figure}
 
 \textbf{Relación entre Categorías y Análisis de Varianza:}
-Para evaluar la independencia entre el local y el canal, y cómo estos impactan al monto, se ejecutaron pruebas de Chi-cuadrado y Kruskal-Wallis (alternativa robusta al ANOVA):
+Para evaluar la independencia entre el local y el canal, y cómo estos impactan al monto, se ejecutaron pruebas de Chi-cuadrado y Kruskal-Wallis (alternativa robusta al ANOVA). Dado que el \texttt{MONTO APLICADO} ya demostró no ser normal (según las pruebas previas de Shapiro-Wilk y Kolmogorov-Smirnov) y presenta un comportamiento fuertemente asimétrico y heterocedástico, se viola el supuesto paramétrico de un ANOVA de una vía (distribución normal de los residuos por grupo); en consecuencia, se opta por utilizar la prueba de Kruskal-Wallis (alternativa no paramétrica basada en rangos) para contrastar la igualdad de medianas y distribuciones entre los distintos grupos.
 
 \vspace{0.4cm}
 \noindent\textbf{Pruebas de Categorías y Varianza:}
 \begin{verbatim}
 Chi-cuadrado de independencia (CANAL vs LOCAL):
-  Chi2=3242878,0, p-value=0,0000
-  Conclusion: CANAL y LOCAL dependen entre si.
+  Chi2=3.242.878,0, p-value=0,0000
+  Tamaño de efecto (V de Cramér): 0,5774 (asociación grande)
 
-Kruskal-Wallis (MONTO APLICADO ~ CANAL): H=5950,5, p-value=0,0000
-Kruskal-Wallis (MONTO APLICADO ~ LOCAL): H=51345,7, p-value=0,0000
+Kruskal-Wallis (MONTO ~ CANAL): H=5.950,5, p=0,0000, eta^2=0,0018 (insignif.)
+Kruskal-Wallis (MONTO ~ LOCAL): H=51.345,7, p=0,0000, eta^2=0,0156 (pequeño)
 \end{verbatim}
 \vspace{0.4cm}
 
-\textbf{Interpretación no técnica:} 
-1) La prueba Chi-cuadrado ($p < 0,05$) rechaza H0, comprobando categóricamente que ciertos canales operan más desde ciertos locales específicos, no son variables independientes.
-2) Kruskal-Wallis ($p < 0,05$) rechaza la igualdad de medianas. El monto final difiere drásticamente según el canal usado y el local de compra.
+\noindent\textbf{Sobre significancia estadística vs.\ práctica (advertencia por $N$ grande).} Con
+$N=3{,}2$ millones de filas, prácticamente cualquier prueba rechaza H0 ($p\to 0$) por el mero tamaño
+muestral; el $p$-value deja de ser informativo. El estadístico Chi-cuadrado ($3.242.878$) es tan
+grande que iguala a $N$, pero un estadístico grande no equivale a un efecto fuerte. Por eso reportamos
+\textbf{tamaños de efecto}, que miden la magnitud real con independencia de $N$: la V de Cramér de
+$0{,}577$ indica una asociación \textbf{fuerte} (aunque no perfecta) entre \texttt{CANAL} y
+\texttt{LOCAL}, explicada estructuralmente por el confinamiento de los canales online en el local
+virtual 1999. En cambio, aunque el monto ``difiere significativamente'' por canal y local, el
+$\eta^2$ ($0{,}0018$ y $0{,}0156$) revela que esas
+diferencias explican \textbf{una fracción ínfima} de la variabilidad del ticket: significativas, pero
+sin relevancia práctica.
+
+\textbf{Interpretación no técnica:}
+1) La prueba Chi-cuadrado ($p < 0,05$) rechaza H0: ciertos canales operan desde locales específicos (no son independientes), y la V de Cramér confirma que la asociación es fuerte.
+2) Kruskal-Wallis ($p < 0,05$) rechaza la igualdad de medianas: el monto difiere según canal y local, aunque el tamaño de efecto indica que en la práctica la diferencia es marginal.
 
 \begin{figure}[H]
     \centering
@@ -256,6 +513,7 @@ Para cumplir con el análisis estacional, se extrajeron 390 días consecutivos, 
     \centering
     \includegraphics[width=0.85\textwidth]{plots/descomposicion_temporal.png}
     \caption{Descomposición Estacional y Tendencia}
+    \label{fig:decomposicion}
 \end{figure}
 \begin{figure}[H]
     \centering
@@ -264,13 +522,56 @@ Para cumplir con el análisis estacional, se extrajeron 390 días consecutivos, 
 \end{figure}
 \textbf{Interpretación no técnica:} Los gráficos confirman una fuerte estacionalidad cíclica y tendencias a lo largo de los meses. La función ACF ratifica la alta autocorrelación (las ventas de hoy dependen estadísticamente de las ventas de ayer), factor crucial para proyecciones futuras (ARIMA).
 
+\vspace{0.4cm}
+\noindent\textbf{Análisis de Fechas Especiales}
+
+Para evaluar empíricamente si las fechas comerciales más relevantes del calendario chileno generan picos de ventas estadísticamente significativos, se cruzó el rango de fechas disponibles en la base de datos (del 09-11-2023 al 02-12-2024) con las siguientes festividades comerciales: Día de la Madre (segundo domingo de mayo), Navidad (24-25 de dic.), Día del Niño (segundo sábado de agosto), Fiestas Patrias (18-19 de sept.), Cyber Day (primeros de junio) y Black Friday (fines de nov.).
+
+Al validar algorítmicamente, se encontró que todas estas fechas comerciales caen dentro de la ventana global de 390 días de nuestra base de datos. El detalle de validación de las 10 fechas evaluadas en el rango es el siguiente:
+\begin{itemize}
+    \item \textbf{[EN RANGO]} Día de la Madre: 2024-05-12
+    \item \textbf{[EN RANGO]} Navidad (1): 2023-12-24
+    \item \textbf{[EN RANGO]} Navidad (2): 2023-12-25
+    \item \textbf{[EN RANGO]} Fiestas Patrias (1): 2024-09-18
+    \item \textbf{[EN RANGO]} Fiestas Patrias (2): 2024-09-19
+    \item \textbf{[EN RANGO]} Día del Niño: 2024-08-10
+    \item \textbf{[EN RANGO]} Cyber Day (1): 2024-06-03
+    \item \textbf{[EN RANGO]} Cyber Day (2): 2024-06-04
+    \item \textbf{[EN RANGO]} Cyber Day (3): 2024-06-05
+    \item \textbf{[EN RANGO]} Black Friday: 2023-11-24
+\end{itemize}
+
+Se generó entonces una ventana comparativa de $\pm 7$ días alrededor de cada fecha detectada. Sin embargo, para evitar que la planicie de bajo volumen al inicio de la serie (finales de 2023 y principios de 2024, atribuida a aperturas progresivas de sucursales) distorsione el promedio base "Normal" a la baja, se excluyó dicho periodo de rampa del test estadístico. \textbf{El corte del 1 de marzo de 2024 se determinó observando el punto exacto en el componente de tendencia de la descomposición estacional (Figura~\ref{fig:decomposicion}) donde el volumen diario se estabiliza por encima del sub-registro inicial.} Esta exclusión delimita el análisis estrictamente al rango del \textbf{01-03-2024 al 02-12-2024} (lo cual descarta del test a Black Friday 2023 y Navidad 2023). Esto consolida un total de 277 días analizables, desglosados en 63 días válidos en la ventana "Especial" frente a 214 días "Normales".
+
+\vspace{0.4cm}
+\noindent\textbf{Análisis de Medias y Prueba de Mann-Whitney U:}
+\begin{verbatim}
+Días en ventana especial validos (±7 días): 63
+Días normales validos: 214
+Monto promedio diario (Especial): 125.132.607,98
+Monto promedio diario (Normal): 117.425.115,86
+Monto mediano diario (Especial): 105.899.315,00
+Monto mediano diario (Normal): 90.886.205,00
+Mann-Whitney U: U=7.430,0, p-value=2.174172e-01
+Tamaño de efecto (rango-biserial): r=-0,1022 (magnitud pequeña)
+\end{verbatim}
+\vspace{0.4cm}
+
+\textbf{Interpretación no técnica:} Al comparar las ventas diarias dentro de la ventana de festividades contra el resto del año (descartando el periodo inicial inestable para mayor rigurosidad), se observa que la mediana y el promedio de ventas son superiores durante las fechas comerciales. Sin embargo, la varianza intrínseca de las ventas diarias es muy alta. La prueba no paramétrica de Mann-Whitney U arroja un p-value de $0,217$ ($> 0,05$), lo que significa que fallamos en rechazar la hipótesis nula: \textbf{no existe una diferencia estadísticamente significativa} entre el volumen de ventas de las ventanas comerciales y el resto del año consolidado. Esto confirma que las ventas de Cruz Morada, fuertemente ancladas en demandas de salud inelásticas, no logran un diferencial estadísticamente distinguible atribuible al retail masivo de estas fechas, descartando un pico estacional anómalo. Se adjunta el gráfico comparativo donde se delimita la exclusión del periodo de rampa en azul y se marcan en rojo las ventanas evaluadas.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{plots/ventas_fechas_especiales.png}
+    \caption{Ventas Diarias vs Ventana de Fechas Especiales}
+\end{figure}
+
 \section{Fase 3: Inferencia Estadística}
 Se pusieron a prueba cinco aseveraciones de negocio.
 
 \textbf{1. ¿El ticket promedio (MONTO APLICADO) en APP es mayor que en WEB?}
 \begin{itemize}
-    \item \textbf{Prueba:} Mann-Whitney U (p-value = 0,3603).
-    \item \textbf{Interpretación no técnica:} Dado que $0,36 > 0,05$, no rechazamos H0. No hay evidencia estadística que un canal deje mayores tickets que el otro. La diferencia aparente es por azar de la muestra.
+    \item \textbf{Prueba:} Mann-Whitney U (p-value = 0,3603); tamaño de efecto rango-biserial $r=-0,001$ (insignificante).
+    \item \textbf{Interpretación no técnica:} Dado que $0,36 > 0,05$, no rechazamos H0. No hay evidencia estadística de que un canal deje mayores tickets que el otro; el tamaño de efecto nulo lo confirma. La diferencia aparente es azar de la muestra.
 \end{itemize}
 
 \textbf{2. ¿El \% de descuento afecta las unidades vendidas?}
@@ -280,59 +581,59 @@ Se pusieron a prueba cinco aseveraciones de negocio.
 
 \textbf{3. (H. Propia 1) ¿El ticket promedio difiere según el GÉNERO?}
 \begin{itemize}
-    \item \textbf{Prueba:} Mann-Whitney U (p-value = 0,0000).
-    \item \textbf{Interpretación no técnica:} Se rechaza H0 ($p < 0,05$). Existe una diferencia real; los clientes masculinos registran tickets levemente más altos (\$10.698) que las clientas femeninas (\$9.929).
+    \item \textbf{Prueba:} Mann-Whitney U (p-value = 0,0000); tamaño de efecto rango-biserial $r=-0,047$ (\textbf{insignificante}).
+    \item \textbf{Interpretación no técnica:} Se rechaza H0 ($p < 0,05$): los clientes masculinos registran tickets levemente más altos (\$10.698) que las clientas femeninas (\$9.929). \textbf{Matiz clave:} con $N=3{,}2$M el $p$-value es prácticamente $0$ por el tamaño muestral, pero el tamaño de efecto ($r=-0,047$) muestra que la diferencia, aunque real, es \textbf{prácticamente despreciable}.
 \end{itemize}
 
 \textbf{4. (H. Propia 2) ¿La edad está relacionada con la frecuencia de compra?}
 \begin{itemize}
-    \item \textbf{Prueba:} Correlación de Spearman (p-value = 0,0000).
-    \item \textbf{Interpretación no técnica:} Se rechaza H0 ($p < 0,05$). A mayor edad del cliente, existe mayor propensión a visitar la farmacia más veces.
+    \item \textbf{Prueba:} Correlación de Spearman ($\rho=0,127$, p-value = 0,0000); el propio $\rho$ es el tamaño de efecto (magnitud pequeña).
+    \item \textbf{Interpretación no técnica:} Se rechaza H0 ($p < 0,05$). A mayor edad del cliente hay mayor propensión a visitar la farmacia más veces, aunque la asociación es débil ($\rho=0,127$).
 \end{itemize}
 
 \textbf{5. (H. Propia 3) ¿El nivel de descuento otorgado varía según el CANAL (POS, APP, WEB)?}
 \begin{itemize}
-    \item \textbf{Prueba:} Kruskal-Wallis (p-value = 0,0000).
-    \item \textbf{Interpretación no técnica:} Se rechaza H0 ($p < 0,05$). La política de descuentos no es uniforme y es estadísticamente dependiente del canal de ingreso.
+    \item \textbf{Prueba:} Kruskal-Wallis (p-value = 0,0000); tamaño de efecto $\eta^2=0,005$ (insignificante).
+    \item \textbf{Interpretación no técnica:} Se rechaza H0 ($p < 0,05$): la política de descuentos depende del canal de ingreso. No obstante, el $\eta^2$ indica que el canal explica una fracción mínima de la variación del descuento.
 \end{itemize}
 
 \section{Fase 4: Modelado Predictivo (Regresión OLS)}
-Se empleó el modelo de \textbf{Opción A (Regresión Lineal Múltiple)} para intentar predecir matemáticamente el MONTO APLICADO, usando como predictores el porcentaje de descuento, las unidades, el local y el canal. El conjunto se dividió 70\% Entrenamiento y 30\% Prueba.
+Se empleó el modelo de \textbf{Opción A (Regresión Lineal Múltiple)} para predecir el \texttt{MONTO APLICADO}. El modelo final es \texttt{MONTO $\sim$ PORCENTAJE DESCUENTO + CANAL}. De los cuatro predictores sugeridos por la rúbrica se excluyeron dos, con justificación estadística: \texttt{UNIDADES} (constante, varianza cero: perfectamente colineal con el intercepto) y \texttt{LOCAL} (identificador nominal de alta cardinalidad y, además, estructuralmente colineal con \texttt{CANAL} —los canales online se registran en un único local virtual—, lo que vuelve singular la matriz de diseño). Ambas exclusiones y su diagnóstico se detallan en la Sección~\ref{sec:dificultades}; el efecto categórico de \texttt{LOCAL} sobre el monto ya quedó caracterizado en el EDA (Kruskal-Wallis, $\eta^2=0{,}0156$). El conjunto se dividió 70\% Entrenamiento y 30\% Prueba.
 
 \vspace{0.4cm}
 \noindent\textbf{Coeficientes de la Regresión OLS (Datos no estandarizados):}
 \begin{verbatim}
-Variable                 Coef         Std Err      t          P>|t|
--------------------------------------------------------------------
-PORCENTAJE DESCUENTO     54370,000    81,286       668,901    0,000
-UNIDADES*               -10940,000    33,225      -329,286    0,000
-LOCAL                       -0,126     0,004       -32,543    0,000
-CANAL_WEB                 -570,977    56,580       -10,091    0,000
-CANAL_CCT                -2503,318  1081,898        -2,314    0,021
-CANAL_APP                -1586,669    76,381       -20,773    0,000
+Variable               Coef          Std Err      t          P>|t|
+------------------------------------------------------------------
+const                 -11.070,00      32,98      -335,704    0,000
+PORCENTAJE DESCUENTO   54.320,00      81,29       668,213    0,000
+CANAL_WEB                 -668,77      56,51       -11,834    0,000
+CANAL_CCT              -2.600,82   1.082,15         -2,403    0,016
+CANAL_APP              -1.683,88      76,34        -22,058    0,000
 \end{verbatim}
-\textit{*Nota: Los estimadores para UNIDADES son un artefacto matricial (seudoinversa). Carecen de validez y significancia real. Ver explicación matemática a continuación.}
 \vspace{0.4cm}
 
 \textbf{Interpretación de Coeficientes en el Negocio:}
-Al utilizar deliberadamente los datos en bruto (sin estandarizar), la regresión nos permite traducir los coeficientes de forma directa a pesos chilenos. Por ejemplo:
+Al utilizar deliberadamente los datos en bruto (sin estandarizar), la regresión permite traducir los coeficientes directamente a pesos chilenos:
 \begin{itemize}
-    \item Manteniendo todo lo demás constante, pasar de $0\%$ a $100\%$ de descuento aumenta teóricamente el monto final en $\$54.370$ CLP. (Esta aparente paradoja ilustra una fuerte relación correlacional subyacente: los mayores descuentos absolutos se entregan a los medicamentos de especialidad cuyo precio base es altísimo).
-    \item Efecto del Canal: El intercepto base es el canal \texttt{POS} (presencial). Todos los demás canales reducen el ticket promedio relativo al POS. Por ejemplo, una transacción en la aplicación móvil (\texttt{CANAL\_APP}) resulta en promedio $\$1.586,67$ CLP menor. Por otro lado, \texttt{CANAL\_CCT} (Call Center Telefónico) muestra la mayor reducción ($-\$2.503,31$ CLP), pero presenta un error estándar gigantesco ($1.081,89$), lo que evidencia estadísticamente que CCT opera sobre un volumen marginal de registros en comparación a los demás canales.
-    \item \textbf{El Artefacto Matemático de \texttt{UNIDADES}:} El estimador OLS le asigna a \texttt{UNIDADES} un coeficiente de $-10.940$ con altísima "significancia" estadística ($t = -329,286$). Puesto que \texttt{UNIDADES} es una constante (varianza cero), esto es matemáticamente imposible en un OLS tradicional por colinealidad perfecta con el intercepto. Lo que refleja la tabla es un artefacto de la matriz seudoinversa de Moore-Penrose, la cual \texttt{statsmodels} aplica silenciosamente al detectar una matriz de diseño singular (ambas columnas, \texttt{const} y \texttt{UNIDADES}, están llenas de $1s$). El algoritmo evita el colapso dividiendo la magnitud del intercepto real entre ambas columnas. Desde el punto de vista del negocio y el rigor estadístico, este coeficiente carece de validez e interpretación; la variable debió ser excluida del diseño matricial a priori.
+    \item \textbf{Descuento:} manteniendo el canal constante, pasar de $0\%$ a $100\%$ de descuento se asocia a un aumento de $\$54.320$ CLP en el monto. Esta aparente paradoja (más descuento, más monto) es \textbf{correlacional, no causal}: los mayores descuentos absolutos se aplican a medicamentos de especialidad cuyo precio base es muy alto. El intercepto ($-\$11.070$) no es interpretable de forma aislada (equivaldría a extrapolar a descuento $0\%$); evaluado en el descuento medio ($0,392$) reproduce el ticket promedio observado ($\sim\$10.180$).
+    \item \textbf{Canal:} el canal base (intercepto) es \texttt{POS} (presencial). Todos los canales reducen el ticket relativo al POS: \texttt{WEB} $-\$668,77$, \texttt{APP} $-\$1.683,88$ y \texttt{CCT} (Call Center) $-\$2.600,82$. \texttt{CCT} exhibe la mayor reducción pero también el mayor error estándar ($1.082,15$), coherente con su volumen marginal (226 transacciones).
+    \item \textbf{Predictores excluidos:} \texttt{UNIDADES} (constante) y \texttt{LOCAL} (nominal y colineal con \texttt{CANAL}) se excluyeron \textit{a priori} por las razones detalladas en la Sección~\ref{sec:dificultades}. Gracias a ello la matriz de diseño es no singular y todos los VIF resultan $\approx 1{,}0$ (sin artefactos de seudoinversa).
 \end{itemize}
 
 \subsection{Validación y Diagnóstico de Supuestos}
 \vspace{0.4cm}
 \noindent\textbf{Diagnóstico y Métricas:}
 \begin{verbatim}
-Metricas (Prueba 30%):
-  R-cuadrado ajustado: 0,1644
-  RMSE: 13.217,73
-  MAE:   6.290,39
+Ajuste en entrenamiento:
+  R-cuadrado: 0,1645   R-cuadrado ajustado: 0,1645
+Validacion (conjunto de prueba 30%):
+  R-cuadrado (prueba): 0,1640
+  RMSE: 13.220,88
+  MAE:   6.291,93
 
 Homocedasticidad (Breusch-Pagan): p-value=0,0000 (Heterocedasticidad)
-Normalidad residuos (Shapiro-Wilk): p-value=1.17e-78 (NO normales)
+Normalidad residuos (Shapiro-Wilk): p-value=1.10e-78 (NO normales)
 Independencia (Durbin-Watson): 1,9987 (Sin autocorrelacion)
 \end{verbatim}
 \vspace{0.4cm}
@@ -361,28 +662,429 @@ El único supuesto que se cumple perfectamente es la \textbf{Ausencia de Multico
 \vspace{0.4cm}
 \noindent\textbf{Factor de Inflación de Varianza (VIF):}
 \begin{verbatim}
-  PORCENTAJE DESCUENTO: VIF=1,0045 (sin colinealidad)
-  UNIDADES:             VIF=1,0000* (valor imputado)
-  LOCAL:                VIF=1,0049 (sin colinealidad)
-  CANAL_WEB:            VIF=1,0052 (sin colinealidad)
+  PORCENTAJE DESCUENTO: VIF=1,0041 (sin colinealidad)
+  CANAL_WEB:            VIF=1,0024 (sin colinealidad)
   CANAL_CCT:            VIF=1,0000 (sin colinealidad)
-  CANAL_APP:            VIF=1,0039 (sin colinealidad)
+  CANAL_APP:            VIF=1,0024 (sin colinealidad)
 \end{verbatim}
 \vspace{0.4cm}
-\textit{*Nota sobre UNIDADES: Como se discutió en la interpretación de los coeficientes OLS, \texttt{UNIDADES} es una constante con colinealidad perfecta respecto al intercepto, por lo que su verdadero VIF matemático es infinito (indefinido). El valor $1,0000$ reportado aquí no es un hallazgo estadístico, sino un \textbf{valor de resguardo imputado manualmente} en el código (ver Sección 7) para evitar el colapso por error matemático del algoritmo de álgebra lineal (\texttt{SVD did not converge}). Los demás predictores sí exhiben VIFs genuinamente calculados y estadísticamente óptimos (cercanos a 1,0).}
+\textit{Todos los VIF son $\approx 1{,}0$: los predictores del modelo final son mutuamente independientes. Este resultado limpio es consecuencia directa de haber excluido \textit{a priori} a \texttt{UNIDADES} y \texttt{LOCAL} (ver Sección~\ref{sec:dificultades}); en versiones previas del modelo, su inclusión producía VIF de hasta $10^{11}$ y coeficientes de seudoinversa —el diagnóstico que motivó su exclusión.}
 
 \subsection{Interpretación Crítica y Extrapolabilidad}
-El modelo presenta un $R^2$ ajustado muy pobre (0,1644), explicando solo el 16,4\% del ticket final, y un error absoluto medio (MAE) de \$6.290 CLP.
+El modelo presenta un $R^2$ ajustado muy pobre (0,1645 en entrenamiento; el $R^2$ sobre el conjunto de prueba es 0,1640), explicando apenas $\sim$16,4\% de la varianza del ticket final, con un error absoluto medio (MAE) de \$6.291,93 CLP.
 
 \textbf{¿El modelo es extrapolable?} 
 No. El modelo es puramente descriptivo básico y sufre de \textbf{omisión de variables críticas}. Intentar predecir el total a pagar utilizando si compró en la APP o el POS, ignorando la variable de negocio de mayor peso físico (el \textbf{precio base o SKU} de los medicamentos), produce coeficientes estadísticamente sesgados. Este error de diseño genera la ruptura generalizada de los supuestos visualizada en los residuales, imposibilitando la extrapolación causal de los hallazgos al negocio real.
 
+\section{Síntesis de Resultados (Cuadro de Mando)}
+\label{sec:dashboard}
+La Tabla~\ref{tab:dashboard} reúne, de forma ordenada, las métricas clave de las cuatro fases y de la
+evaluación de rendimiento. Es un resumen de referencia: la justificación de cada decisión y la
+interpretación de cada número se desarrollan en la sección correspondiente; aquí se consolidan para
+una lectura rápida.
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{p{5.6cm} p{4.3cm} p{4.0cm}}
+\toprule
+\textbf{Métrica} & \textbf{Valor} & \textbf{Lectura} \\
+\midrule
+\multicolumn{3}{l}{\textit{\textbf{Fase 1 --- Datos y Preprocesamiento}}} \\
+Registros procesados & 3.242.878 $\times$ 9 col. & carga particionada (Dask) \\
+Clientes únicos & 1.183.242 & frecuencia por cliente \\
+Nulos reales (DESCUENTO, F.\,NAC.) & 0,00\% & imputación preventiva \\
+Edades inválidas imputadas & 2.876 (mediana 49,9) & ruido, no ``missing'' \\
+Outliers de MONTO (IQR) & 149.377 (4,61\%) & se marcan, no se eliminan \\
+\midrule
+\multicolumn{3}{l}{\textit{\textbf{Fase 2 --- Exploratorio (EDA)}} \; \footnotesize(magnitud práctica vía tamaño de efecto)} \\
+Normalidad de MONTO (Shapiro) & $p = 2{,}9\times10^{-84}$ & no normal $\Rightarrow$ Spearman \\
+MONTO $\sim$ DESCUENTO (Spearman) & $\rho \approx 0{,}48$ & asociación positiva (media) \\
+CANAL $\sim$ LOCAL (Chi$^2$) & V de Cramér $=0{,}577$ & dependientes (asoc.\ grande) \\
+MONTO $\sim$ CANAL (Kruskal) & $H=5.950{,}5$; $\eta^2=0{,}0018$ & difiere; efecto \textbf{insignificante} \\
+MONTO $\sim$ LOCAL (Kruskal) & $H=51.345{,}7$; $\eta^2=0{,}0156$ & difiere; efecto pequeño \\
+\midrule
+\multicolumn{3}{l}{\textit{\textbf{Fase 3 --- Inferencia (5 hipótesis)}}} \\
+H1: APP $>$ WEB (Mann-Whitney) & $p=0{,}360$; $r=-0{,}001$ & no se rechaza \\
+H2: DESCUENTO $\to$ UNIDADES & degenerada & UNIDADES $\equiv 1$ \\
+Propia 1: GÉNERO (Mann-Whitney) & $p<0{,}001$; $r=-0{,}047$ & se rechaza, pero efecto insignif. \\
+Propia 2: EDAD $\sim$ FREC. (Spearman) & $\rho=0{,}127$, $p<0{,}001$ & se rechaza; efecto pequeño \\
+Propia 3: DESCUENTO $\sim$ CANAL (Kruskal) & $H\approx16.535$; $\eta^2=0{,}005$ & se rechaza; efecto insignif. \\
+Fechas especiales (Mann-Whitney) & $p=0{,}217$; $r=-0{,}102$ & sin pico estacional \\
+\midrule
+\multicolumn{3}{l}{\textit{\textbf{Fase 4 --- Modelo OLS} (\texttt{MONTO $\sim$ DESCUENTO + CANAL})}} \\
+$R^2$ ajustado (train) / $R^2$ (test) & 0,1645 / 0,1640 & ajuste pobre \\
+RMSE / MAE & 13.220,88 / 6.291,93 & error elevado \\
+Breusch-Pagan / Shapiro (resid.) & $p<0{,}001$ / $p<0{,}001$ & heteroced.; no normal \\
+Durbin-Watson / VIF & 1,999 / $\approx 1{,}0$ & sin autocorr.; sin colinealidad \\
+\midrule
+\multicolumn{3}{l}{\textit{\textbf{Rendimiento y verificación (Sección~\ref{sec:benchmark})}}} \\
+Mejor planificador & \texttt{threads}: 18,36\,s total & 1,27$\times$ en preprocesamiento \\
+\texttt{processes} / \texttt{LocalCluster} & 0,32$\times$ / óptimo estable & IPC vs.\ datos residentes \\
+Tamaño de partición óptimo & 64\,MB (61,81\,s) & vs.\ 32\,MB / 128\,MB \\
+Integridad / Determinismo & 26/26 / 37/37 & correcto y reproducible \\
+\bottomrule
+\end{tabular}
+\caption{Cuadro de mando: síntesis de las métricas clave del análisis y de la evaluación de
+rendimiento. Cada valor se explica e interpreta en su sección respectiva.}
+\label{tab:dashboard}
+\end{table}
+
+\section{Conclusiones y Recomendaciones de Negocio}
+\label{sec:conclusiones}
+Integrando los hallazgos de las cuatro fases, se extraen las siguientes conclusiones para Cruz Morada:
+
+\begin{itemize}
+    \item \textbf{Demanda inelástica, sin estacionalidad comercial.} Las ventas no muestran un pico estadísticamente significativo en las fechas comerciales del calendario chileno (Mann-Whitney $p=0,217$; efecto pequeño $r=-0,10$). Es coherente con un negocio de salud: la demanda de medicamentos es relativamente inelástica y no sigue los ciclos del retail masivo. \textbf{Recomendación:} no sobreinvertir en campañas atadas a fechas comerciales; la serie sí exhibe fuerte autocorrelación (ACF), por lo que la planificación de inventario se beneficiaría más de un modelo de series de tiempo (ARIMA) que de calendarios promocionales.
+    \item \textbf{Diferencias reales pero prácticamente irrelevantes.} Género, canal y local arrojan diferencias ``altamente significativas'' ($p\to 0$) que, medidas por tamaño de efecto, son \textbf{insignificantes o pequeñas} ($r=-0,047$ para género; $\eta^2=0,0018$ y $0,0156$ para canal y local). El gran $N$ ($3,2$M) hace que casi todo sea significativo; la magnitud real es lo que importa para el negocio. \textbf{Recomendación:} no segmentar la estrategia de precios por género ni por canal esperando un impacto material en el ticket.
+    \item \textbf{El ticket lo gobierna el precio base del producto, no las variables disponibles.} El modelo OLS explica solo $\sim$16\% de la varianza del monto ($R^2=0,164$), con residuos heterocedásticos y no normales. La relación positiva descuento--monto es un \textbf{artefacto de confusión}: los mayores descuentos se aplican a medicamentos de especialidad de precio alto. \textbf{Recomendación:} para predecir o entender el ticket, incorporar la variable omitida de mayor peso —el \texttt{SKU}/precio base del producto—, ausente en este conjunto.
+    \item \textbf{Confusión estructural canal--local.} Los canales online se registran en un local virtual único (\texttt{LOCAL 1999}), lo que confunde canal y local (V de Cramér $0,577$). Es un aspecto a considerar en cualquier análisis futuro por tienda: el ``local'' online no es una sucursal física.
+    \item \textbf{Eficiencia computacional.} Para este volumen (dataset denso que cabe en RAM, una sola máquina de 10 núcleos), el planificador \texttt{threads} es el óptimo (1,3$\times$); el multiproceso ingenuo (\texttt{processes}) \textit{degrada} el rendimiento por IPC, y \texttt{LocalCluster} es la vía correcta de escalamiento a datos mayores o múltiples nodos. \textbf{Recomendación:} mantener \texttt{threads} en producción y migrar a \texttt{LocalCluster} solo si el volumen supera la memoria.
+\end{itemize}
+
 \section{Dificultades Encontradas y Solución de Problemas}
+\label{sec:dificultades}
 \begin{enumerate}
     \item \textbf{Desbordamiento de Memoria (OOM):} Al intentar cargar masivamente con \texttt{pandas}, el sistema colapsaba. \\ 
-    \textit{Solución:} Implementar el motor \texttt{Dask DataFrame} con lectura lazy y particiones (chunks), logrando resolver 3,2M de filas en $\sim 13$ segundos.
-    \item \textbf{Colapso Matemático de Multicolinealidad (VIF):} El código usa la inversa de la matriz de correlación para el VIF. Al ser \texttt{UNIDADES} una constante (1 unidad por cliente, varianza 0), la correlación computaba \texttt{NaN} y la matriz no se podía invertir (error \texttt{SVD did not converge}). \\
-    \textit{Solución:} Se codificó una intercepción previa que imputa 0 en las covarianzas espurias y 1 en la diagonal para variables constantes. Esto permitió extraer limpiamente un VIF de 1,0000 para \texttt{UNIDADES}, evitando que el algoritmo de álgebra lineal colapse y sin afectar la integridad del resto de variables.
+    \textit{Solución:} Implementar el motor \texttt{Dask DataFrame} con lectura lazy y particiones (chunks), procesando las 3,2M de filas en $\sim 15$ segundos con el planificador \texttt{threads} (véase la evaluación de rendimiento de la Sección~\ref{sec:benchmark}, que además demuestra por qué el planificador \texttt{processes} degradaría este tiempo a $\sim 61$\,s por sobrecosto de IPC).
+    \item \textbf{Matriz de diseño singular por dos fuentes de colinealidad (OLS).} Un primer diseño ingenuo del modelo, siguiendo literalmente la rúbrica (\texttt{MONTO $\sim$ DESCUENTO + UNIDADES + LOCAL + CANAL}), producía una matriz de diseño \textbf{singular} y coeficientes absurdos del orden de $10^{12}$ (artefacto de la seudoinversa de Moore-Penrose). El diagnóstico reveló \textbf{dos} fuentes independientes de colinealidad perfecta:
+    \begin{itemize}
+        \item \texttt{UNIDADES} es constante ($\equiv 1$, varianza 0): es una copia del intercepto, por lo que es linealmente dependiente de \texttt{const}.
+        \item \texttt{LOCAL} está \textbf{estructuralmente confundido con \texttt{CANAL}}: el diagnóstico mostró que el indicador \texttt{LOCAL\_1999} es \textit{idéntico} a la suma de los indicadores de canal online (los coeficientes de seudoinversa aparecen con igual magnitud y signo opuesto, prueba de una dependencia lineal exacta). Esto revela que los canales online (\texttt{WEB}, \texttt{APP}, \texttt{CCT}) se registran en un único ``local virtual'' (\texttt{LOCAL 1999}), lo que es coherente con la alta V de Cramér ($0{,}577$) medida en el EDA.
+    \end{itemize}
+    \textit{Solución:} en lugar de imputar valores de resguardo (que enmascararían el problema), se \textbf{excluyeron ambas variables de forma principiada}. \texttt{UNIDADES} no aporta varianza; \texttt{LOCAL} es nominal, de alta cardinalidad, colineal con \texttt{CANAL} en la dimensión online/físico y de efecto marginal pequeño ($\eta^2=0{,}0156$), por lo que su inclusión no compensa la pérdida de identificabilidad. El modelo final (\texttt{MONTO $\sim$ DESCUENTO + CANAL}) es no singular, con todos los VIF $\approx 1{,}0$ y coeficientes interpretables. El efecto de \texttt{LOCAL} sobre el monto queda documentado por separado en el EDA (Kruskal-Wallis, $\eta^2=0{,}0156$).
 \end{enumerate}
+
+\appendix
+\section{Anexo A: Ejecución de Referencia (Prueba de Ejecución)}
+\label{sec:anexo}
+Este anexo reproduce \textbf{literalmente} la salida por pantalla de una ejecución completa del
+programa, obtenida con \texttt{CPYD\_SEED=42 python3 main.py data/ventas\_completas.csv} en el
+equipo de la Tabla~\ref{tab:entorno} (Apple M4, planificador \texttt{threads}). Sirve de
+\textit{prueba de ejecución}: los números del informe son la salida real y reproducible del
+pipeline, no valores inventados. Cada bloque se antecede de una explicación de \textit{qué
+demuestra}. Se omite una tabla de contingencia de 792 filas por brevedad; algunas tablas crudas de
+\texttt{pandas} son muy anchas y se muestran en cuerpo reducido.
+
+\subsection*{Fase 1 --- Carga y Preprocesamiento (paralelo con Dask)}
+\textbf{Qué demuestra:} la semilla se fija desde \texttt{CPYD\_SEED}; el planificador activo es
+\texttt{threads} (10 \textit{workers}); las pruebas MCAR confirman \textbf{0\% de nulos reales}. Se
+computan en paralelo la frecuencia de \textbf{1.183.242 clientes}, la imputación de \textbf{2.876
+edades} inválidas (mediana 49,9) y los descriptivos; se materializan \textbf{3.242.878 filas} y se
+marcan \textbf{149.377 outliers} (IQR, 4,61\%). \texttt{UNIDADES} da asimetría/curtosis \texttt{NA}
+por varianza cero (esperado).
+
+{\scriptsize
+\begin{verbatim}
+================================================================================
+          SISTEMA DE ANÁLISIS ESTADÍSTICO Y MODELADO DE VENTAS
+================================================================================
+Archivo de entrada: data/ventas_completas.csv
+[Determinismo] Semilla configurada desde CPYD_SEED: 42
+
+[Paso 1/4] Preprocesamiento y limpieza de datos (paralelo con Dask)...
+[Paralelo] Planificador multihilo (memoria compartida, limitado por GIL para ops CPU-bound de pandas) con 10 workers.
+[Determinismo] Semilla configurada desde CPYD_SEED: 42
+
+--- Prueba de mecanismo de valores faltantes (MAR vs MCAR) ---
+Proporción de nulos en PORCENTAJE DESCUENTO (muestra de 50,000): 0.0000%
+Tabla de contingencia (CANAL vs DESCUENTO nulo):
+PORCENTAJE DESCUENTO  False
+CANAL                      
+POS                   49890
+WEB                     110
+No hay valores nulos suficientes en la muestra para la prueba de independencia.
+Cargando con Dask (bloques de 64MB, parseo paralelo) desde: data/ventas_completas.csv
+[Paralelo] 10 particiones lógicas (una tarea por bloque).
+
+--- Prueba de mecanismo de valores faltantes para FECHA NACIMIENTO ---
+
+Proporción de nulos globales (muestra de 3,242,878): 0.0000%
+Tabla de contingencia (CANAL vs FECHA NACIMIENTO nulo):
+FECHA_NAC_ES_NULO        0
+CANAL                     
+POS                3119427
+WEB                  79987
+CCT                    226
+APP                  43238
+No hay valores nulos suficientes en la muestra para la prueba de independencia con CANAL.
+
+Proporción de nulos globales (muestra de 3,242,878): 0.0000%
+Tabla de contingencia (LOCAL vs FECHA NACIMIENTO nulo):
+  [ ... tabla de 792 locales omitida por brevedad: 0% de nulos ... ]
+No hay valores nulos suficientes en la muestra para la prueba de independencia con LOCAL.
+[Paralelo] Frecuencia de 1,183,242 clientes calculada en 0.84 s.
+
+Edades inválidas o faltantes detectadas: 2,876. Se imputan con la mediana (49.9 años).
+[Paralelo] Estadísticos descriptivos calculados en 0.82 s sobre 6 columnas.
+
+Estadísticos descriptivos calculados en paralelo:
+  UNIDADES: media=1.0000, desv_std=0.0000, minimo=1.0000, maximo=1.0000, asimetria=NA, curtosis=NA
+  PORCENTAJE DESCUENTO: media=0.3920, desv_std=0.1080, minimo=0.0000, maximo=1.0000, asimetria=0.2969, curtosis=2.8491
+  MONTO APLICADO: media=10,179.9777, desv_std=14,453.2397, minimo=15.0000, maximo=226,476.0000, asimetria=9.0603, curtosis=108.2272
+  MONTO POR UNIDAD: media=10,179.9777, desv_std=14,453.2397, minimo=15.0000, maximo=226,476.0000, asimetria=9.0603, curtosis=108.2272
+  EDAD: media=49.5745, desv_std=16.7247, minimo=0.0055, maximo=109.8453, asimetria=0.2419, curtosis=-0.7823
+  FRECUENCIA CLIENTE: media=5.6542, desv_std=5.4562, minimo=1.0000, maximo=110.0000, asimetria=3.2557, curtosis=21.5177
+
+Materializando DataFrame limpio en memoria (compute paralelo)...
+DataFrame limpio: 3,242,878 filas, 10 columnas.
+
+Detección de outliers en MONTO APLICADO (método IQR):
+  Rango aceptable: [-4,562.50, 23,929.50]
+  Outliers detectados: 149,377 (4.61%)
+  Decisión: se marcan pero no se eliminan; corresponden a compras reales de alto valor (medicamentos especializados), no a errores de registro.
+
+Estandarizando variables continuas: ['PORCENTAJE DESCUENTO', 'MONTO APLICADO', 'MONTO POR UNIDAD', 'EDAD', 'FRECUENCIA CLIENTE']
+  PORCENTAJE DESCUENTO: media=0.3920, desv_std=0.1080
+  MONTO APLICADO: media=10179.9777, desv_std=14453.2374
+  MONTO POR UNIDAD: media=10179.9777, desv_std=14453.2374
+  EDAD: media=49.5745, desv_std=16.7247
+  FRECUENCIA CLIENTE: media=5.6542, desv_std=5.4562
+
+Preprocesamiento finalizado.
+\end{verbatim}
+}
+
+
+\subsection*{Fase 2 --- Análisis Exploratorio (EDA)}
+\textbf{Qué demuestra:} ninguna variable es normal (Shapiro/KS, $p\ll0{,}05$), justificando Spearman
+y pruebas no paramétricas. Con \textbf{tamaños de efecto}: V de Cramér(CANAL,LOCAL)$=0{,}577$ (grande,
+por el confinamiento online$=$LOCAL 1999), pero $\eta^2$ de MONTO por CANAL ($0{,}0018$) y LOCAL
+($0{,}0156$) son insignificante/pequeño: con $N=3{,}2$M todo es ``significativo'', pero la magnitud
+práctica es baja. Fechas especiales: $p=0{,}217$ (rango-biserial $-0{,}102$), sin pico estacional.
+
+{\scriptsize
+\begin{verbatim}
+[Paso 2/4] Análisis exploratorio y visualizaciones...
+
+=== 1) Estadística Descriptiva ===
+                UNIDADES  PORCENTAJE DESCUENTO  MONTO APLICADO  MONTO POR UNIDAD      EDAD  FRECUENCIA CLIENTE
+Media                1.0                0.3920    1.017998e+04      1.017998e+04   49.5745              5.6542
+Mediana              1.0                0.4000    7.662000e+03      7.662000e+03   48.6297              4.0000
+Varianza             0.0                0.0117    2.088961e+08      2.088961e+08  279.7172             29.7698
+Desv. Estándar       0.0                0.1080    1.445324e+04      1.445324e+04   16.7247              5.4562
+Mínimo               1.0                0.0000    1.500000e+01      1.500000e+01    0.0055              1.0000
+Máximo               1.0                1.0000    2.264760e+05      2.264760e+05  109.8453            110.0000
+Asimetría            0.0                0.2969    9.060300e+00      9.060300e+00    0.2419              3.2557
+Curtosis             0.0                2.8491    1.082274e+02      1.082274e+02   -0.7823             21.5178
+
+=== 2) Pruebas de Normalidad (muestra de 5,000, los tests se degradan con millones de filas) ===
+PORCENTAJE DESCUENTO:
+  Shapiro-Wilk: W=0.8562, p-value=1.600758e-55
+  Kolmogorov-Smirnov: D=0.1951, p-value=3.514943e-167
+  Conclusión: la variable NO sigue una distribución normal.
+MONTO APLICADO:
+  Shapiro-Wilk: W=0.3967, p-value=2.901537e-84
+  Kolmogorov-Smirnov: D=0.2539, p-value=1.268822e-284
+  Conclusión: la variable NO sigue una distribución normal.
+EDAD:
+  Shapiro-Wilk: W=0.9797, p-value=3.788937e-26
+  Kolmogorov-Smirnov: D=0.0487, p-value=1.000633e-10
+  Conclusión: la variable NO sigue una distribución normal.
+
+Generando histogramas con curvas de densidad...
+Generando boxplots por categoría...
+
+=== 3) Matriz de Correlación con Prueba de Significancia ===
+Coeficientes de Spearman (elegido por la no-normalidad de las variables):
+                      UNIDADES  PORCENTAJE DESCUENTO  MONTO APLICADO    EDAD  FRECUENCIA CLIENTE
+UNIDADES                   1.0                   NaN             NaN     NaN                 NaN
+PORCENTAJE DESCUENTO       NaN                1.0000          0.4840 -0.0033              0.2967
+MONTO APLICADO             NaN                0.4840          1.0000  0.0974              0.2214
+EDAD                       NaN               -0.0033          0.0974  1.0000              0.1272
+FRECUENCIA CLIENTE         NaN                0.2967          0.2214  0.1272              1.0000
+
+p-values asociados:
+                       UNIDADES  PORCENTAJE DESCUENTO  MONTO APLICADO       EDAD  FRECUENCIA CLIENTE
+UNIDADES              0.000e+00            indefinido      indefinido indefinido          indefinido
+PORCENTAJE DESCUENTO indefinido             0.000e+00       0.000e+00  1.351e-01           0.000e+00
+MONTO APLICADO       indefinido             0.000e+00       0.000e+00  0.000e+00           0.000e+00
+EDAD                 indefinido             1.351e-01       0.000e+00  0.000e+00           0.000e+00
+FRECUENCIA CLIENTE   indefinido             0.000e+00       0.000e+00  0.000e+00           0.000e+00
+
+=== 4) Pruebas de Asociación ===
+
+Chi-cuadrado de independencia (CANAL vs LOCAL):
+  Chi2=3242878.0000, gl=2373, p-value=0.000000e+00
+  Tamaño de efecto (V de Cramér): 0.5774 (asociación grande)
+  Conclusión: CANAL y LOCAL dependen entre sí.
+  Nota: con N muy grande el p-value es ~0 casi por construcción; la V de Cramér mide la MAGNITUD real de la asociación.
+
+Correlaciones entre UNIDADES, MONTO APLICADO y PORCENTAJE DESCUENTO (Spearman):
+  UNIDADES vs MONTO APLICADO: correlación indefinida (UNIDADES tiene varianza cero).
+  UNIDADES vs PORCENTAJE DESCUENTO: correlación indefinida (UNIDADES tiene varianza cero).
+  MONTO APLICADO vs PORCENTAJE DESCUENTO: rho=0.4827, p-value=0.000000e+00
+
+ANOVA de un factor (MONTO APLICADO ~ CANAL):
+  ANOVA paramétrico: F=152.5429, p-value=7.367832e-99
+  Kruskal-Wallis (no paramétrico): H=5950.5194, p-value=0.000000e+00
+  Tamaño de efecto (eta^2): 0.0018 (magnitud insignificante)
+  Conclusión: el monto difiere significativamente entre niveles de CANAL (pero el tamaño de efecto indica relevancia práctica insignificante).
+
+ANOVA de un factor (MONTO APLICADO ~ LOCAL):
+  ANOVA paramétrico: F=37.8254, p-value=0.000000e+00
+  Kruskal-Wallis (no paramétrico): H=51345.7439, p-value=0.000000e+00
+  Tamaño de efecto (eta^2): 0.0156 (magnitud pequeña)
+  Conclusión: el monto difiere significativamente entre niveles de LOCAL (pero el tamaño de efecto indica relevancia práctica pequeña).
+
+=== 5) Análisis de Patrones Temporales ===
+Serie diaria construida: 390 días (2023-11-09 a 2024-12-02).
+Descomposición y gráficos ACF/PACF guardados en 'plots/'.
+
+--- Análisis de Fechas Especiales ---
+Fechas candidatas evaluadas y su estado:
+  [EN RANGO] Día de la Madre: 2024-05-12
+  [EN RANGO] Navidad (1): 2023-12-24
+  [EN RANGO] Navidad (2): 2023-12-25
+  [EN RANGO] Fiestas Patrias (1): 2024-09-18
+  [EN RANGO] Fiestas Patrias (2): 2024-09-19
+  [EN RANGO] Día del Niño: 2024-08-10
+  [EN RANGO] Cyber Day (1): 2024-06-03
+  [EN RANGO] Cyber Day (2): 2024-06-04
+  [EN RANGO] Cyber Day (3): 2024-06-05
+  [EN RANGO] Black Friday: 2023-11-24
+
+Excluyendo período de rampa (antes de 2024-03-01) para evitar sesgo en el baseline:
+Días en ventana especial validos (±7 días): 63
+Días normales validos: 214
+Monto promedio (Especial): 125132607.98
+Monto promedio (Normal): 117425115.86
+Monto mediano (Especial): 105899315.00
+Monto mediano (Normal): 90886205.00
+Mann-Whitney U: U=7430.0, p-value=2.174172e-01
+Tamaño de efecto (rango-biserial): r=-0.1022 (magnitud pequeña)
+
+Análisis exploratorio finalizado. Visualizaciones guardadas en 'plots/'.
+\end{verbatim}
+}
+
+
+\subsection*{Fase 3 --- Inferencia Estadística (5 hipótesis)}
+\textbf{Qué demuestra:} H1 (APP$>$WEB) no se rechaza ($p=0{,}360$, $r=-0{,}001$); H2 es degenerada
+(\texttt{UNIDADES} constante); las tres hipótesis propias se rechazan ($p<0{,}001$), pero sus
+tamaños de efecto son insignificantes/pequeños (género $r=-0{,}047$; edad$\sim$frecuencia
+$\rho=0{,}127$; descuento$\sim$canal $\eta^2=0{,}005$): efectos reales de escasa relevancia práctica.
+
+{\scriptsize
+\begin{verbatim}
+[Paso 3/4] Inferencia estadística y pruebas de hipótesis...
+
+=== Inferencia Estadística: Pruebas de Hipótesis ===
+
+Hipótesis 1: el ticket promedio (MONTO APLICADO) en APP es mayor que en WEB.
+  Media APP: 10,750.44 (N=43,238)
+  Media WEB: 11,167.70 (N=79,987)
+  T-test de Welch (unilateral): t=-5.3079, p-value=9.999999e-01
+  Mann-Whitney U (no paramétrico): U=1731369237.5000, p-value=3.603635e-01
+  Tamaño de efecto (rango-biserial): r=-0.0012 (magnitud insignificante)
+  No se rechaza H0 (p >= 0.05): no hay evidencia de efecto significativo.
+
+Hipótesis 2: el % de descuento afecta significativamente las unidades vendidas.
+  Desviación estándar de UNIDADES: 0.0000
+  UNIDADES tiene varianza cero (todas las transacciones registran 1 unidad).
+  La regresión UNIDADES ~ DESCUENTO es matemáticamente degenerada: no existe variación que explicar, por lo que la hipótesis no es evaluable en estos datos.
+
+Hipótesis propia 1: el ticket promedio difiere según GÉNERO (1=Masculino, 2=Femenino).
+  Media Masculino: 10,698.75 (N=1,055,885)
+  Media Femenino: 9,929.51 (N=2,186,993)
+  T-test de Welch: t=45.0372, p-value=0.000000e+00
+  Mann-Whitney U: U=1209372387023.5000, p-value=0.000000e+00
+  Tamaño de efecto (rango-biserial): r=-0.0474 (magnitud insignificante)
+  Se rechaza H0 (p < 0.05): el efecto es estadísticamente significativo.
+
+Hipótesis propia 2: la edad y la frecuencia de compra están monotónicamente asociadas.
+  Spearman: rho=0.1272, p-value=0.000000e+00
+  Se rechaza H0 (p < 0.05): el efecto es estadísticamente significativo.
+
+Hipótesis propia 3: el descuento promedio varía según el CANAL de compra.
+  ANOVA: F=4399.1962, p-value=0.000000e+00
+  Kruskal-Wallis: H=16534.9211, p-value=0.000000e+00
+  Tamaño de efecto (eta^2): 0.0051 (magnitud insignificante)
+  Se rechaza H0 (p < 0.05): el efecto es estadísticamente significativo.
+\end{verbatim}
+}
+
+
+\subsection*{Fase 4 --- Modelado Predictivo (Regresión OLS)}
+\textbf{Qué demuestra:} el modelo final \texttt{MONTO $\sim$ DESCUENTO + CANAL} (con \texttt{UNIDADES}
+y \texttt{LOCAL} excluidos y justificados). $R^2$ ajustado $=0{,}1645$ (train), $R^2$ de prueba
+$=0{,}1640$; RMSE $=13.220{,}88$; MAE $=6.291{,}93$. Diagnóstico: heterocedasticidad, no normalidad
+de residuos, independencia (Durbin-Watson $=1{,}999$) y \textbf{ausencia de multicolinealidad} (todos
+los VIF $\approx 1{,}00$): la matriz de diseño ya no es singular tras las exclusiones.
+
+{\scriptsize
+\begin{verbatim}
+[Paso 4/4] Ajuste y evaluación del modelo de regresión...
+
+=== Modelado Predictivo: Regresión Lineal Múltiple (Opción A) ===
+Variable objetivo: MONTO APLICADO.
+Predictores: PORCENTAJE DESCUENTO (continua) y CANAL (categórica, dummies).
+EXCLUSIONES JUSTIFICADAS:
+  - UNIDADES: constante (varianza 0), perfectamente colineal con el
+    intercepto; incluirla es inválido (artefacto de seudoinversa).
+  - LOCAL: identificador NOMINAL de alta cardinalidad (792 locales) y,
+    además, ESTRUCTURALMENTE COLINEAL con CANAL: los canales online
+    (WEB/APP/CCT) se registran en un único local virtual (LOCAL 1999),
+    por lo que incluir CANAL y LOCAL juntos vuelve SINGULAR la matriz de
+    diseño. Su efecto categórico se caracteriza en el EDA (Kruskal por LOCAL).
+  Partición 70/30 -> train: 2,270,014, test: 972,864
+
+Coeficientes del modelo OLS (statsmodels):
+========================================================================================
+                           coef    std err          t      P>|t|      [0.025      0.975]
+----------------------------------------------------------------------------------------
+const                -1.107e+04     32.984   -335.704      0.000   -1.11e+04    -1.1e+04
+PORCENTAJE DESCUENTO  5.432e+04     81.287    668.213      0.000    5.42e+04    5.45e+04
+CANAL_WEB             -668.7723     56.514    -11.834      0.000    -779.537    -558.007
+CANAL_CCT            -2600.8160   1082.146     -2.403      0.016   -4721.784    -479.848
+CANAL_APP            -1683.8770     76.340    -22.058      0.000   -1833.500   -1534.254
+========================================================================================
+R²: 0.1645, R² ajustado: 0.1645
+
+Validación en el conjunto de prueba (30%):
+  R² = 0.1640 | RMSE = 13,220.88 | MAE = 6,291.93
+
+--- Diagnóstico de Supuestos del Modelo ---
+  Gráficos de diagnóstico guardados en 'plots/'.
+
+  Homocedasticidad (Breusch-Pagan): LM=209563.3423, p-value=0.000000e+00
+    Se rechaza homocedasticidad: hay heterocedasticidad en los residuos.
+  Normalidad de residuos (Shapiro-Wilk, muestra 5.000): W=0.5329, p-value=1.097612e-78
+    Los residuos NO siguen una distribución normal.
+  Independencia de residuos (Durbin-Watson): 1.9987 (valores cercanos a 2 indican ausencia de autocorrelación).
+
+  Multicolinealidad (VIF, vía inversa de la matriz de correlación de predictores):
+    PORCENTAJE DESCUENTO: VIF=1.0041 (sin colinealidad)
+    CANAL_WEB: VIF=1.0024 (sin colinealidad)
+    CANAL_CCT: VIF=1.0000 (sin colinealidad)
+    CANAL_APP: VIF=1.0024 (sin colinealidad)
+\end{verbatim}
+}
+
+
+\subsection*{Cierre --- Tiempos por Fase}
+\textbf{Qué demuestra:} el planificador utilizado fue \texttt{threads} y el \textit{pipeline}
+completo se resolvió en \textbf{$\sim$19,7 s} (preprocesamiento $\sim$14,7 s, EDA $\sim$2,9 s,
+OLS $\sim$1,3 s). La diferencia con la Tabla~\ref{tab:fullpipe} ($\sim$18,4 s para \texttt{threads})
+es esperada: el arnés de \textit{benchmark} omite la generación de figuras para aislar el costo de
+cómputo, mientras que esta ejecución de referencia sí produce todos los gráficos.
+
+{\scriptsize
+\begin{verbatim}
+================================================================================
+PROCESAMIENTO COMPLETO FINALIZADO CON ÉXITO
+Planificador Dask (Paso 1): threads
+Tiempos por fase (perf_counter):
+  Preprocesamiento (Dask-paralelo, incluye carga): 14.70 s
+  EDA (secuencial, pandas/scipy):                  2.85 s
+  Inferencia (secuencial, scipy):                  0.84 s
+  Modelado OLS (secuencial, statsmodels):          1.31 s
+Tiempo total del pipeline: 19.69 segundos.
+Gráficos guardados en: /Users/aztellas/Documents/Trabajo-paralela-02/plots
+================================================================================
+\end{verbatim}
+}
+
 
 \end{document}

@@ -15,3 +15,7 @@ seaborn
 
 # === Machine Learning (split train/test, métricas, StandardScaler) ===
 scikit-learn
+
+# === Benchmark de rendimiento (opcional; usados por benchmark_advanced.py y sysinfo.py) ===
+distributed   # planificador Dask distribuido (LocalCluster)
+psutil        # muestreo de memoria/swap durante el benchmark

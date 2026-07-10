@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import chi2_contingency
 from sklearn.preprocessing import StandardScaler
+import dask.dataframe as dd
 
 from src.data_loader import DataLoader
 from src.parallel_processor import ParallelProcessor
@@ -14,10 +15,11 @@ MAX_VALID_AGE = 110
 class Preprocessor:
 
     # Inicializa el preprocesador con el cargador de datos, la semilla y el motor paralelo.
-    def __init__(self, data_loader: DataLoader, seed: int = 42):
+    # scheduler: 'threads' (default, óptimo empírico), 'processes', o 'synchronous'.
+    def __init__(self, data_loader: DataLoader, seed: int = 42, scheduler: str = 'threads'):
         self.loader = data_loader
         self.seed = seed
-        self.parallel = ParallelProcessor()
+        self.parallel = ParallelProcessor(scheduler=scheduler)
         self.scaler = StandardScaler()
         self.scaling_params = {}
 
@@ -45,6 +47,35 @@ class Preprocessor:
         else:
             print("Conclusión: no se rechaza independencia; los nulos son compatibles con MCAR.")
             print("La imputación con 0.0 (valor de negocio 'sin descuento') no introduce sesgo por canal.")
+
+    def test_fecha_nac_missingness_mcar(self, ddf):
+        print("\n--- Prueba de mecanismo de valores faltantes para FECHA NACIMIENTO ---")
+        ddf['FECHA_NAC_ES_NULO'] = ddf['FECHA NACIMIENTO'].isna().astype(int)
+        
+        for factor in ['CANAL', 'LOCAL']:
+            # Computar tabla de contingencia con Dask
+            contingency_table = ddf.groupby([factor, 'FECHA_NAC_ES_NULO']).size().compute().unstack(fill_value=0)
+            
+            total_rows = contingency_table.sum().sum()
+            null_count = contingency_table.get(1, pd.Series(0, index=contingency_table.index)).sum()
+            missing_rate = null_count / total_rows
+            
+            print(f"\nProporción de nulos globales (muestra de {int(total_rows):,}): {missing_rate:.4%}")
+            print(f"Tabla de contingencia ({factor} vs FECHA NACIMIENTO nulo):")
+            print(contingency_table)
+    
+            if contingency_table.shape[1] < 2 or 1 not in contingency_table.columns:
+                print(f"No hay valores nulos suficientes en la muestra para la prueba de independencia con {factor}.")
+            else:
+                chi2, p_val, dof, _ = chi2_contingency(contingency_table)
+                print(f"Chi2={chi2:.4f}, gl={dof}, p-value={p_val:.6e}")
+                if p_val < 0.05:
+                    print(f"Conclusión: la ausencia depende de {factor} (mecanismo MAR).")
+                else:
+                    print(f"Conclusión: no se rechaza independencia; los nulos son compatibles con MCAR respecto a {factor}.")
+        
+        # Eliminar la columna indicadora
+        return ddf.drop(columns=['FECHA_NAC_ES_NULO'])
 
     # Marca los outliers de MONTO APLICADO según los límites IQR sin eliminarlos.
     def flag_outliers(self, df: pd.DataFrame, lower: float, upper: float) -> pd.DataFrame:
@@ -80,6 +111,7 @@ class Preprocessor:
         ddf = self.parallel.balance_partitions(ddf)
         ddf = self.parallel.clean_missing_values(ddf)
         ddf = self.parallel.create_derived_variables(ddf)
+        ddf = self.test_fecha_nac_missingness_mcar(ddf)
         ddf = ddf.drop(columns=['FECHA NACIMIENTO'])
         ddf = ddf.persist()
         ddf = self.parallel.add_client_frequency(ddf)
@@ -87,6 +119,10 @@ class Preprocessor:
 
         valid_ages = ddf['EDAD'].where((ddf['EDAD'] >= 0) & (ddf['EDAD'] <= MAX_VALID_AGE))
         median_age = valid_ages.quantile(0.5).compute()
+        if pd.isna(median_age):
+            print("\nADVERTENCIA: No se encontraron edades válidas para computar la mediana.")
+            print("Fallback a valor por defecto documentado: 35.0 años.")
+            median_age = 35.0
         invalid_age = ddf['EDAD'].isna() | (ddf['EDAD'] < 0) | (ddf['EDAD'] > MAX_VALID_AGE)
         n_invalid = int(invalid_age.sum().compute())
         print(f"\nEdades inválidas o faltantes detectadas: {n_invalid:,}. "

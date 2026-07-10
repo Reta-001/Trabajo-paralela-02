@@ -1,0 +1,383 @@
+{
+  "meta": {
+    "timestamp": "2026-07-10T10:14:27.178413+00:00",
+    "data_file": "data/ventas_completas.csv",
+    "seed": 42,
+    "cores": 10,
+    "blocksize": "64MB",
+    "runs": 3,
+    "have_psutil": true,
+    "have_distributed": true
+  },
+  "results": {
+    "synchronous": {
+      "summary": {
+        "setup": {
+          "mean": 6.166666935314424e-06,
+          "std": 4.1814232798789996e-07
+        },
+        "graph_build": {
+          "mean": 0.008858736333422712,
+          "std": 0.00033833287285747255
+        },
+        "persist": {
+          "mean": 5.340644971999912,
+          "std": 0.6512688242979853
+        },
+        "intermediate": {
+          "mean": 13.445650902999963,
+          "std": 0.14058963533102528
+        },
+        "materialize": {
+          "mean": 0.6756780276664358,
+          "std": 0.03882130475599225
+        },
+        "preprocess_total": {
+          "mean": 19.470832638999735,
+          "std": 0.7680538928392137
+        },
+        "n_compute": 8,
+        "row_count": 3242878,
+        "peak_used_gb": 7.077,
+        "swap_out_delta_mb": 2.42,
+        "main_proc_peak_rss_gb": 1.908
+      },
+      "runs": [
+        {
+          "graph_build": 0.00845629100149381,
+          "persist": 6.261133250000057,
+          "intermediate": 13.537495624999792,
+          "materialize": 0.7304665409992595,
+          "n_compute": 8,
+          "row_count": 3242878,
+          "preprocess_total": 20.537551707000603,
+          "setup": 5.959000191069208e-06,
+          "memory": {
+            "psutil": true,
+            "peak_used_gb": 7.077,
+            "swap_out_delta_mb": 2.42,
+            "main_proc_peak_rss_gb": 1.807
+          }
+        },
+        {
+          "graph_build": 0.009284083998863935,
+          "persist": 4.907834749999893,
+          "intermediate": 13.552442584001255,
+          "materialize": 0.6452334170007816,
+          "n_compute": 8,
+          "row_count": 3242878,
+          "preprocess_total": 19.114794835000794,
+          "setup": 5.791000148747116e-06,
+          "memory": {
+            "psutil": true,
+            "peak_used_gb": 6.449,
+            "swap_out_delta_mb": 1.28,
+            "main_proc_peak_rss_gb": 1.807
+          }
+        },
+        {
+          "graph_build": 0.008835833999910392,
+          "persist": 4.852966915999787,
+          "intermediate": 13.24701449999884,
+          "materialize": 0.6513341249992664,
+          "n_compute": 8,
+          "row_count": 3242878,
+          "preprocess_total": 18.760151374997804,
+          "setup": 6.750000466126949e-06,
+          "memory": {
+            "psutil": true,
+            "peak_used_gb": 6.267,
+            "swap_out_delta_mb": 0.84,
+            "main_proc_peak_rss_gb": 1.908
+          }
+        }
+      ]
+    },
+    "threads": {
+      "summary": {
+        "setup": {
+          "mean": 4.764000550494529e-06,
+          "std": 3.9122705858947756e-07
+        },
+        "graph_build": {
+          "mean": 0.010010221999740073,
+          "std": 0.001600803709632799
+        },
+        "persist": {
+          "mean": 3.907425361000302,
+          "std": 0.03766407743079269
+        },
+        "intermediate": {
+          "mean": 10.36995020799865,
+          "std": 0.09834593178900518
+        },
+        "materialize": {
+          "mean": 0.6805188746663285,
+          "std": 0.032193346120827436
+        },
+        "preprocess_total": {
+          "mean": 14.967904665665023,
+          "std": 0.1497434039562766
+        },
+        "n_compute": 8,
+        "row_count": 3242878,
+        "peak_used_gb": 5.978,
+        "swap_out_delta_mb": 6.8,
+        "main_proc_peak_rss_gb": 3.238
+      },
+      "runs": [
+        {
+          "graph_build": 0.007746375000351691,
+          "persist": 3.869085542000903,
+          "intermediate": 10.412365290998423,
+          "materialize": 0.6996597079996718,
+          "n_compute": 8,
+          "row_count": 3242878,
+          "preprocess_total": 14.98885691599935,
+          "setup": 4.292000085115433e-06,
+          "memory": {
+            "psutil": true,
+            "peak_used_gb": 5.978,
+            "swap_out_delta_mb": 1.08,
+            "main_proc_peak_rss_gb": 3.233
+          }
+        },
+        {
+          "graph_build": 0.011152458000651677,
+          "persist": 3.8945731250005338,
+          "intermediate": 10.234031707999748,
+          "materialize": 0.6351736249998794,
+          "n_compute": 8,
+          "row_count": 3242878,
+          "preprocess_total": 14.774930916000812,
+          "setup": 4.75000160804484e-06,
+          "memory": {
+            "psutil": true,
+            "peak_used_gb": 5.919,
+            "swap_out_delta_mb": 0.39,
+            "main_proc_peak_rss_gb": 3.233
+          }
+        },
+        {
+          "graph_build": 0.01113183299821685,
+          "persist": 3.95861741599947,
+          "intermediate": 10.463453624997783,
+          "materialize": 0.7067232909994345,
+          "n_compute": 8,
+          "row_count": 3242878,
+          "preprocess_total": 15.139926164994904,
+          "setup": 5.249999958323315e-06,
+          "memory": {
+            "psutil": true,
+            "peak_used_gb": 5.963,
+            "swap_out_delta_mb": 6.8,
+            "main_proc_peak_rss_gb": 3.238
+          }
+        }
+      ]
+    },
+    "processes": {
+      "summary": {
+        "setup": {
+          "mean": 4.402666794097361e-06,
+          "std": 2.8524457440459656e-07
+        },
+        "graph_build": {
+          "mean": 0.011328611000256691,
+          "std": 0.0003004979448740939
+        },
+        "persist": {
+          "mean": 4.896774583333051,
+          "std": 0.12421151399138482
+        },
+        "intermediate": {
+          "mean": 38.748824777999594,
+          "std": 0.8825550143973487
+        },
+        "materialize": {
+          "mean": 9.711708388666617,
+          "std": 0.4984499992424036
+        },
+        "preprocess_total": {
+          "mean": 53.36863636099952,
+          "std": 0.4886075960630195
+        },
+        "n_compute": 8,
+        "row_count": 3242878,
+        "peak_used_gb": 6.35,
+        "swap_out_delta_mb": 6.48,
+        "main_proc_peak_rss_gb": 3.238
+      },
+      "runs": [
+        {
+          "graph_build": 0.0117143749994284,
+          "persist": 4.827632583001105,
+          "intermediate": 39.229557667000336,
+          "materialize": 9.614050416999817,
+          "n_compute": 8,
+          "row_count": 3242878,
+          "preprocess_total": 53.682955042000685,
+          "setup": 3.99999953515362e-06,
+          "memory": {
+            "psutil": true,
+            "peak_used_gb": 6.35,
+            "swap_out_delta_mb": 2.09,
+            "main_proc_peak_rss_gb": 3.238
+          }
+        },
+        {
+          "graph_build": 0.010981333000017912,
+          "persist": 4.791498208998746,
+          "intermediate": 37.51094795900099,
+          "materialize": 10.365124666001066,
+          "n_compute": 8,
+          "row_count": 3242878,
+          "preprocess_total": 52.67855216700082,
+          "setup": 4.583000190905295e-06,
+          "memory": {
+            "psutil": true,
+            "peak_used_gb": 6.054,
+            "swap_out_delta_mb": 5.27,
+            "main_proc_peak_rss_gb": 3.238
+          }
+        },
+        {
+          "graph_build": 0.011290125001323759,
+          "persist": 5.071192957999301,
+          "intermediate": 39.505968707997454,
+          "materialize": 9.15595008299897,
+          "n_compute": 8,
+          "row_count": 3242878,
+          "preprocess_total": 53.74440187399705,
+          "setup": 4.625000656233169e-06,
+          "memory": {
+            "psutil": true,
+            "peak_used_gb": 6.097,
+            "swap_out_delta_mb": 6.48,
+            "main_proc_peak_rss_gb": 3.238
+          }
+        }
+      ]
+    },
+    "distributed": {
+      "summary": {
+        "setup": {
+          "mean": 2.315187930667283,
+          "std": 0.07153461415718487
+        },
+        "graph_build": {
+          "mean": 0.013964763998956187,
+          "std": 0.0019716491025519784
+        },
+        "persist": {
+          "mean": 1.3689896389999678,
+          "std": 0.0169480698417756
+        },
+        "intermediate": {
+          "mean": 7.314951736666747,
+          "std": 0.20284705352688867
+        },
+        "materialize": {
+          "mean": 8.53009424999982,
+          "std": 9.072333893475369
+        },
+        "preprocess_total": {
+          "mean": 17.228000389665493,
+          "std": 9.18994089624431
+        },
+        "n_compute": 8,
+        "row_count": 3242878,
+        "peak_used_gb": 6.487,
+        "swap_out_delta_mb": 2.5,
+        "main_proc_peak_rss_gb": 3.238
+      },
+      "runs": [
+        {
+          "graph_build": 0.016736207999201724,
+          "persist": 1.3866885000006732,
+          "intermediate": 7.457182250998812,
+          "materialize": 21.360235083999214,
+          "n_compute": 8,
+          "row_count": 3242878,
+          "preprocess_total": 30.2208420429979,
+          "setup": 2.2928062500013766,
+          "memory": {
+            "psutil": true,
+            "peak_used_gb": 6.487,
+            "swap_out_delta_mb": 2.5,
+            "main_proc_peak_rss_gb": 3.238
+          }
+        },
+        {
+          "graph_build": 0.012313666999034467,
+          "persist": 1.3461431249997986,
+          "intermediate": 7.028086042000723,
+          "materialize": 2.076578457999858,
+          "n_compute": 8,
+          "row_count": 3242878,
+          "preprocess_total": 10.463121291999414,
+          "setup": 2.2409381670004223,
+          "memory": {
+            "psutil": true,
+            "peak_used_gb": 6.277,
+            "swap_out_delta_mb": 0.16,
+            "main_proc_peak_rss_gb": 3.238
+          }
+        },
+        {
+          "graph_build": 0.012844416998632369,
+          "persist": 1.374137291999432,
+          "intermediate": 7.459586917000706,
+          "materialize": 2.153469208000388,
+          "n_compute": 8,
+          "row_count": 3242878,
+          "preprocess_total": 11.000037833999158,
+          "setup": 2.41181937500005,
+          "memory": {
+            "psutil": true,
+            "peak_used_gb": 6.409,
+            "swap_out_delta_mb": 1.31,
+            "main_proc_peak_rss_gb": 3.238
+          }
+        }
+      ]
+    }
+  },
+  "sysinfo": {
+    "platform": "macOS-26.5.1-arm64-arm-64bit",
+    "system": "Darwin",
+    "machine": "arm64",
+    "processor": "arm",
+    "python_version": "3.11.15",
+    "python_impl": "CPython",
+    "mp_start_method": "spawn",
+    "mp_cpu_count": 10,
+    "os_cpu_count": 10,
+    "macos": {
+      "chip_brand": "Apple M4",
+      "hw_model": "Mac16,12",
+      "physical_cpu": "10",
+      "logical_cpu": "10",
+      "perf_cores_P": "4",
+      "efficiency_cores_E": "6",
+      "ram_bytes": "17179869184",
+      "ram_gb": 16.0,
+      "page_size": "16384"
+    },
+    "sw_vers": {
+      "ProductName": "macOS",
+      "ProductVersion": "26.5.1",
+      "BuildVersion": "25F80"
+    },
+    "libraries": {
+      "dask": "2026.7.0",
+      "distributed": "2026.7.0",
+      "pandas": "3.0.3",
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "statsmodels": "0.14.6",
+      "sklearn": "1.9.0",
+      "psutil": "7.2.2"
+    }
+  }
+}

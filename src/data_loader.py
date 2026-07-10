@@ -8,12 +8,15 @@ import pandas as pd
 
 # Cargador del archivo de ventas con soporte de lectura completa, por fragmentos y con Dask.
 class DataLoader:
+    # Nota: se usan dict/tuple (no MappingProxyType) porque los tipos immutables
+    # vía MappingProxyType no son serializables (pickle) bajo scheduler='processes'
+    # con start_method='spawn' (macOS). Son constantes de clase de sólo lectura.
     COLUMN_TYPES = {
         'CANAL': 'category',
         'SKU': 'int64',
         'PRODUCTO': 'string',
         'UNIDADES': 'Int32',
-        'PORCENTAJE DESCUENTO': 'float32',
+        'PORCENTAJE DESCUENTO': 'float64',  # float64 is used project-wide for precision consistency in p-value and coefficient calculations
         'MONTO APLICADO': 'float64',
         'BOLETA': 'Int64',
         'LOCAL': 'Int32',
@@ -24,11 +27,11 @@ class DataLoader:
         'FECHA NACIMIENTO': 'string',
         'GENERO': 'Int8',
     }
-    ANALYTIC_COLUMNS = [
+    ANALYTIC_COLUMNS = (
         'FECHA', 'CANAL', 'UNIDADES', 'PORCENTAJE DESCUENTO',
         'MONTO APLICADO', 'LOCAL', 'CODIGO CLIENTE',
         'FECHA NACIMIENTO', 'GENERO',
-    ]
+    )
     CSV_OPTIONS = {'sep': ';', 'quotechar': '"'}
 
     # Inicializa el cargador con la ruta del archivo (o la ruta por defecto en data/).
@@ -62,18 +65,29 @@ class DataLoader:
     # Filtra el diccionario de tipos de columnas según las columnas solicitadas.
     def _dtypes_for(self, columns):
         if columns is None:
-            return self.COLUMN_TYPES
+            return dict(self.COLUMN_TYPES)
         return {k: v for k, v in self.COLUMN_TYPES.items() if k in columns}
+
+    def _intersect_columns(self, requested_columns):
+        if requested_columns is None:
+            return None
+        actual_cols = pd.read_csv(self.file_path, nrows=0, **self.CSV_OPTIONS).columns.tolist()
+        intersected = [c for c in requested_columns if c in actual_cols]
+        missing = set(requested_columns) - set(intersected)
+        if missing:
+            print(f"Advertencia: Las siguientes columnas esperadas no se encontraron en el archivo y serán ignoradas: {missing}")
+        return intersected
 
     # Carga el archivo completo en un DataFrame de pandas.
     def load_full(self, columns: list = None) -> pd.DataFrame:
         self.validate_path()
+        cols_to_use = self._intersect_columns(columns)
         print(f"Cargando archivo completo desde: {self.file_path}")
         df = pd.read_csv(
             self.file_path,
-            dtype=self._dtypes_for(columns),
+            dtype=self._dtypes_for(cols_to_use),
             parse_dates=['FECHA'],
-            usecols=columns,
+            usecols=cols_to_use,
             **self.CSV_OPTIONS,
         )
         print(f"Carga completa terminada. Filas: {len(df):,}, Columnas: {len(df.columns)}")
@@ -82,12 +96,13 @@ class DataLoader:
     # Devuelve un iterador de fragmentos (chunking) para procesar con bajo consumo de memoria.
     def load_chunks(self, chunk_size: int = 100_000, columns: list = None):
         self.validate_path()
+        cols_to_use = self._intersect_columns(columns)
         print(f"Cargando por fragmentos de {chunk_size:,} filas desde: {self.file_path}")
         return pd.read_csv(
             self.file_path,
-            dtype=self._dtypes_for(columns),
+            dtype=self._dtypes_for(cols_to_use),
             parse_dates=['FECHA'],
-            usecols=columns,
+            usecols=cols_to_use,
             chunksize=chunk_size,
             **self.CSV_OPTIONS,
         )
@@ -95,13 +110,14 @@ class DataLoader:
     # Carga el archivo como Dask DataFrame con bloques de tamaño fijo para parseo paralelo.
     def load_dask(self, columns: list = None, blocksize: str = '64MB') -> dd.DataFrame:
         self.validate_path()
+        cols_to_use = self._intersect_columns(columns)
         path = self._ensure_uncompressed()
         print(f"Cargando con Dask (bloques de {blocksize}, parseo paralelo) desde: {path}")
         return dd.read_csv(
             path,
-            dtype=self._dtypes_for(columns),
+            dtype=self._dtypes_for(cols_to_use),
             parse_dates=['FECHA'],
-            usecols=columns,
+            usecols=cols_to_use,
             blocksize=blocksize,
             **self.CSV_OPTIONS,
         )
@@ -109,4 +125,4 @@ class DataLoader:
     # Lee una muestra cruda (sin tipado ni imputación) para pruebas sobre datos originales.
     def load_raw_sample(self, nrows: int = 50_000) -> pd.DataFrame:
         self.validate_path()
-        return pd.read_csv(self.file_path, nrows=nrows, **self.CSV_OPTIONS)
+        return pd.read_csv(self.file_path, nrows=nrows, dtype=self._dtypes_for(None), **self.CSV_OPTIONS)

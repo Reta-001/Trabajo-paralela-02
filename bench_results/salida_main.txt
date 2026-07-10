@@ -5,7 +5,7 @@ Archivo de entrada: data/ventas_completas.csv
 [Determinismo] Semilla configurada desde CPYD_SEED: 42
 
 [Paso 1/4] Preprocesamiento y limpieza de datos (paralelo con Dask)...
-[Paralelo] Planificador multihilo con 10 workers.
+[Paralelo] Planificador multihilo (memoria compartida, limitado por GIL para ops CPU-bound de pandas) con 10 workers.
 [Determinismo] Semilla configurada desde CPYD_SEED: 42
 
 --- Prueba de mecanismo de valores faltantes (MAR vs MCAR) ---
@@ -18,10 +18,41 @@ WEB                     110
 No hay valores nulos suficientes en la muestra para la prueba de independencia.
 Cargando con Dask (bloques de 64MB, parseo paralelo) desde: data/ventas_completas.csv
 [Paralelo] 10 particiones lógicas (una tarea por bloque).
+
+--- Prueba de mecanismo de valores faltantes para FECHA NACIMIENTO ---
+
+Proporción de nulos globales (muestra de 3,242,878): 0.0000%
+Tabla de contingencia (CANAL vs FECHA NACIMIENTO nulo):
+FECHA_NAC_ES_NULO        0
+CANAL                     
+POS                3119427
+WEB                  79987
+CCT                    226
+APP                  43238
+No hay valores nulos suficientes en la muestra para la prueba de independencia con CANAL.
+
+Proporción de nulos globales (muestra de 3,242,878): 0.0000%
+Tabla de contingencia (LOCAL vs FECHA NACIMIENTO nulo):
+FECHA_NAC_ES_NULO     0
+LOCAL                  
+3                  3625
+5                  7070
+6                  3157
+9                  8493
+11                 6706
+...                 ...
+1218                282
+1225                550
+9168                116
+1221                 29
+9165                 48
+
+[792 rows x 1 columns]
+No hay valores nulos suficientes en la muestra para la prueba de independencia con LOCAL.
 [Paralelo] Frecuencia de 1,183,242 clientes calculada en 0.84 s.
 
 Edades inválidas o faltantes detectadas: 2,876. Se imputan con la mediana (49.9 años).
-[Paralelo] Estadísticos descriptivos calculados en 0.80 s sobre 6 columnas.
+[Paralelo] Estadísticos descriptivos calculados en 0.82 s sobre 6 columnas.
 
 Estadísticos descriptivos calculados en paralelo:
   UNIDADES: media=1.0000, desv_std=0.0000, minimo=1.0000, maximo=1.0000, asimetria=NA, curtosis=NA
@@ -63,8 +94,8 @@ Curtosis             0.0                2.8491    1.082274e+02      1.082274e+02
 
 === 2) Pruebas de Normalidad (muestra de 5,000, los tests se degradan con millones de filas) ===
 PORCENTAJE DESCUENTO:
-  Shapiro-Wilk: W=0.8562, p-value=1.600759e-55
-  Kolmogorov-Smirnov: D=0.1951, p-value=0.000000e+00
+  Shapiro-Wilk: W=0.8562, p-value=1.600758e-55
+  Kolmogorov-Smirnov: D=0.1951, p-value=3.514943e-167
   Conclusión: la variable NO sigue una distribución normal.
 MONTO APLICADO:
   Shapiro-Wilk: W=0.3967, p-value=2.901537e-84
@@ -99,7 +130,9 @@ FRECUENCIA CLIENTE   indefinido             0.000e+00       0.000e+00  0.000e+00
 
 Chi-cuadrado de independencia (CANAL vs LOCAL):
   Chi2=3242878.0000, gl=2373, p-value=0.000000e+00
+  Tamaño de efecto (V de Cramér): 0.5774 (asociación grande)
   Conclusión: CANAL y LOCAL dependen entre sí.
+  Nota: con N muy grande el p-value es ~0 casi por construcción; la V de Cramér mide la MAGNITUD real de la asociación.
 
 Correlaciones entre UNIDADES, MONTO APLICADO y PORCENTAJE DESCUENTO (Spearman):
   UNIDADES vs MONTO APLICADO: correlación indefinida (UNIDADES tiene varianza cero).
@@ -109,16 +142,41 @@ Correlaciones entre UNIDADES, MONTO APLICADO y PORCENTAJE DESCUENTO (Spearman):
 ANOVA de un factor (MONTO APLICADO ~ CANAL):
   ANOVA paramétrico: F=152.5429, p-value=7.367832e-99
   Kruskal-Wallis (no paramétrico): H=5950.5194, p-value=0.000000e+00
-  Conclusión: el monto difiere significativamente entre niveles de CANAL.
+  Tamaño de efecto (eta^2): 0.0018 (magnitud insignificante)
+  Conclusión: el monto difiere significativamente entre niveles de CANAL (pero el tamaño de efecto indica relevancia práctica insignificante).
 
 ANOVA de un factor (MONTO APLICADO ~ LOCAL):
   ANOVA paramétrico: F=37.8254, p-value=0.000000e+00
   Kruskal-Wallis (no paramétrico): H=51345.7439, p-value=0.000000e+00
-  Conclusión: el monto difiere significativamente entre niveles de LOCAL.
+  Tamaño de efecto (eta^2): 0.0156 (magnitud pequeña)
+  Conclusión: el monto difiere significativamente entre niveles de LOCAL (pero el tamaño de efecto indica relevancia práctica pequeña).
 
 === 5) Análisis de Patrones Temporales ===
 Serie diaria construida: 390 días (2023-11-09 a 2024-12-02).
 Descomposición y gráficos ACF/PACF guardados en 'plots/'.
+
+--- Análisis de Fechas Especiales ---
+Fechas candidatas evaluadas y su estado:
+  [EN RANGO] Día de la Madre: 2024-05-12
+  [EN RANGO] Navidad (1): 2023-12-24
+  [EN RANGO] Navidad (2): 2023-12-25
+  [EN RANGO] Fiestas Patrias (1): 2024-09-18
+  [EN RANGO] Fiestas Patrias (2): 2024-09-19
+  [EN RANGO] Día del Niño: 2024-08-10
+  [EN RANGO] Cyber Day (1): 2024-06-03
+  [EN RANGO] Cyber Day (2): 2024-06-04
+  [EN RANGO] Cyber Day (3): 2024-06-05
+  [EN RANGO] Black Friday: 2023-11-24
+
+Excluyendo período de rampa (antes de 2024-03-01) para evitar sesgo en el baseline:
+Días en ventana especial validos (±7 días): 63
+Días normales validos: 214
+Monto promedio (Especial): 125132607.98
+Monto promedio (Normal): 117425115.86
+Monto mediano (Especial): 105899315.00
+Monto mediano (Normal): 90886205.00
+Mann-Whitney U: U=7430.0, p-value=2.174172e-01
+Tamaño de efecto (rango-biserial): r=-0.1022 (magnitud pequeña)
 
 Análisis exploratorio finalizado. Visualizaciones guardadas en 'plots/'.
 
@@ -131,6 +189,7 @@ Hipótesis 1: el ticket promedio (MONTO APLICADO) en APP es mayor que en WEB.
   Media WEB: 11,167.70 (N=79,987)
   T-test de Welch (unilateral): t=-5.3079, p-value=9.999999e-01
   Mann-Whitney U (no paramétrico): U=1731369237.5000, p-value=3.603635e-01
+  Tamaño de efecto (rango-biserial): r=-0.0012 (magnitud insignificante)
   No se rechaza H0 (p >= 0.05): no hay evidencia de efecto significativo.
 
 Hipótesis 2: el % de descuento afecta significativamente las unidades vendidas.
@@ -143,6 +202,7 @@ Hipótesis propia 1: el ticket promedio difiere según GÉNERO (1=Masculino, 2=F
   Media Femenino: 9,929.51 (N=2,186,993)
   T-test de Welch: t=45.0372, p-value=0.000000e+00
   Mann-Whitney U: U=1209372387023.5000, p-value=0.000000e+00
+  Tamaño de efecto (rango-biserial): r=-0.0474 (magnitud insignificante)
   Se rechaza H0 (p < 0.05): el efecto es estadísticamente significativo.
 
 Hipótesis propia 2: la edad y la frecuencia de compra están monotónicamente asociadas.
@@ -150,51 +210,64 @@ Hipótesis propia 2: la edad y la frecuencia de compra están monotónicamente a
   Se rechaza H0 (p < 0.05): el efecto es estadísticamente significativo.
 
 Hipótesis propia 3: el descuento promedio varía según el CANAL de compra.
-  ANOVA: F=4398.9585, p-value=0.000000e+00
-  Kruskal-Wallis: H=16535.1367, p-value=0.000000e+00
+  ANOVA: F=4399.1962, p-value=0.000000e+00
+  Kruskal-Wallis: H=16534.9211, p-value=0.000000e+00
+  Tamaño de efecto (eta^2): 0.0051 (magnitud insignificante)
   Se rechaza H0 (p < 0.05): el efecto es estadísticamente significativo.
 
 [Paso 4/4] Ajuste y evaluación del modelo de regresión...
 
 === Modelado Predictivo: Regresión Lineal Múltiple (Opción A) ===
-Variable objetivo: MONTO APLICADO. Predictores: PORCENTAJE DESCUENTO, UNIDADES, LOCAL y CANAL (dummies).
+Variable objetivo: MONTO APLICADO.
+Predictores: PORCENTAJE DESCUENTO (continua) y CANAL (categórica, dummies).
+EXCLUSIONES JUSTIFICADAS:
+  - UNIDADES: constante (varianza 0), perfectamente colineal con el
+    intercepto; incluirla es inválido (artefacto de seudoinversa).
+  - LOCAL: identificador NOMINAL de alta cardinalidad (792 locales) y,
+    además, ESTRUCTURALMENTE COLINEAL con CANAL: los canales online
+    (WEB/APP/CCT) se registran en un único local virtual (LOCAL 1999),
+    por lo que incluir CANAL y LOCAL juntos vuelve SINGULAR la matriz de
+    diseño. Su efecto categórico se caracteriza en el EDA (Kruskal por LOCAL).
   Partición 70/30 -> train: 2,270,014, test: 972,864
 
 Coeficientes del modelo OLS (statsmodels):
 ========================================================================================
                            coef    std err          t      P>|t|      [0.025      0.975]
 ----------------------------------------------------------------------------------------
-PORCENTAJE DESCUENTO  5.437e+04     81.286    668.901      0.000    5.42e+04    5.45e+04
-UNIDADES             -1.094e+04     33.225   -329.286      0.000    -1.1e+04   -1.09e+04
-LOCAL                   -0.1267      0.004    -32.543      0.000      -0.134      -0.119
-CANAL_WEB             -570.9770     56.580    -10.091      0.000    -681.873    -460.081
-CANAL_CCT            -2503.3185   1081.898     -2.314      0.021   -4623.800    -382.837
-CANAL_APP            -1586.6691     76.381    -20.773      0.000   -1736.372   -1436.966
+const                -1.107e+04     32.984   -335.704      0.000   -1.11e+04    -1.1e+04
+PORCENTAJE DESCUENTO  5.432e+04     81.287    668.213      0.000    5.42e+04    5.45e+04
+CANAL_WEB             -668.7723     56.514    -11.834      0.000    -779.537    -558.007
+CANAL_CCT            -2600.8160   1082.146     -2.403      0.016   -4721.784    -479.848
+CANAL_APP            -1683.8770     76.340    -22.058      0.000   -1833.500   -1534.254
 ========================================================================================
-R²: 0.1649, R² ajustado: 0.1649
+R²: 0.1645, R² ajustado: 0.1645
 
 Validación en el conjunto de prueba (30%):
-  R² = 0.1644 | RMSE = 13,217.73 | MAE = 6,290.39
+  R² = 0.1640 | RMSE = 13,220.88 | MAE = 6,291.93
 
 --- Diagnóstico de Supuestos del Modelo ---
   Gráficos de diagnóstico guardados en 'plots/'.
 
-  Homocedasticidad (Breusch-Pagan): LM=209987.8119, p-value=0.000000e+00
+  Homocedasticidad (Breusch-Pagan): LM=209563.3423, p-value=0.000000e+00
     Se rechaza homocedasticidad: hay heterocedasticidad en los residuos.
-  Normalidad de residuos (Shapiro-Wilk, muestra 5.000): W=0.5335, p-value=1.172131e-78
+  Normalidad de residuos (Shapiro-Wilk, muestra 5.000): W=0.5329, p-value=1.097612e-78
     Los residuos NO siguen una distribución normal.
   Independencia de residuos (Durbin-Watson): 1.9987 (valores cercanos a 2 indican ausencia de autocorrelación).
 
   Multicolinealidad (VIF, vía inversa de la matriz de correlación de predictores):
-    PORCENTAJE DESCUENTO: VIF=1.0045 (sin colinealidad)
-    UNIDADES: VIF=1.0000 (sin colinealidad)
-    LOCAL: VIF=1.0049 (sin colinealidad)
-    CANAL_WEB: VIF=1.0052 (sin colinealidad)
+    PORCENTAJE DESCUENTO: VIF=1.0041 (sin colinealidad)
+    CANAL_WEB: VIF=1.0024 (sin colinealidad)
     CANAL_CCT: VIF=1.0000 (sin colinealidad)
-    CANAL_APP: VIF=1.0039 (sin colinealidad)
+    CANAL_APP: VIF=1.0024 (sin colinealidad)
 
 ================================================================================
 PROCESAMIENTO COMPLETO FINALIZADO CON ÉXITO
-Tiempo total del pipeline: 12.67 segundos.
+Planificador Dask (Paso 1): threads
+Tiempos por fase (perf_counter):
+  Preprocesamiento (Dask-paralelo, incluye carga): 14.70 s
+  EDA (secuencial, pandas/scipy):                  2.85 s
+  Inferencia (secuencial, scipy):                  0.84 s
+  Modelado OLS (secuencial, statsmodels):          1.31 s
+Tiempo total del pipeline: 19.69 segundos.
 Gráficos guardados en: /Users/aztellas/Documents/Trabajo-paralela-02/plots
 ================================================================================
