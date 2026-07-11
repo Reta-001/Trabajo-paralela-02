@@ -17,6 +17,7 @@
 \usepackage{float}
 \usepackage{multirow}
 \usepackage{tcolorbox}
+\usepackage{fvextra}   % verbatim con salto de línea (para la salida cruda del Anexo)
 \usepackage{hyperref}
 \usepackage{charter}
 
@@ -49,6 +50,10 @@
 \fancyhead[L]{\textcolor{secondary}{\small Computación Paralela y Distribuida}}
 \fancyhead[R]{\textcolor{secondary}{\small Sección 411}}
 \fancyfoot[C]{\textcolor{darkgray}{\thepage}}
+
+% Permite a LaTeX estirar el espaciado como último recurso para evitar que
+% palabras largas en \texttt{} (p. ej. StandardScaler) se salgan del margen.
+\setlength{\emergencystretch}{3em}
 
 \begin{document}
 
@@ -256,7 +261,7 @@ responde al planificador.
 
 \begin{table}[H]
 \centering
-\small
+\resizebox{\textwidth}{!}{%
 \begin{tabular}{llrrr}
 \toprule
 \textbf{Fase} & \textbf{¿Dask-paralela?} & \textbf{\texttt{synchronous}} & \textbf{\texttt{threads}} & \textbf{\texttt{processes}} \\
@@ -268,7 +273,7 @@ OLS (statsmodels)       & No &  0,48 $\pm$ 0,02 &  0,43 $\pm$ 0,01 &  0,40 $\pm$
 \midrule
 \textbf{TOTAL}          & Mixta & \textbf{22,62 $\pm$ 0,11} & \textbf{18,36 $\pm$ 0,14} & \textbf{63,92 $\pm$ 0,16} \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \caption{Tiempo del \textit{pipeline} completo por fase (media $\pm$ desv.\ de 3 ejecuciones, en
 segundos). Los tiempos absolutos difieren de la Tabla~\ref{tab:benchmark} (medida en otra sesión) por
 la variabilidad térmica/de carga de la máquina entre ejecuciones (hasta $\sim$15\%); las
@@ -364,10 +369,12 @@ APP                  43.238
 CCT                    304
 POS                3.119.349
 WEB                  79.987
-No hay valores nulos suficientes en la muestra para la prueba de independencia con CANAL.
+No hay valores nulos suficientes en la muestra para la
+prueba de independencia con CANAL.
 
 Proporción de nulos globales (muestra de 3.242.878): 0,0000%
-No hay valores nulos suficientes en la muestra para la prueba de independencia con LOCAL.
+No hay valores nulos suficientes en la muestra para la
+prueba de independencia con LOCAL.
 \end{verbatim}
 \vspace{0.4cm}
 
@@ -479,8 +486,8 @@ Chi-cuadrado de independencia (CANAL vs LOCAL):
   Chi2=3.242.878,0, p-value=0,0000
   Tamaño de efecto (V de Cramér): 0,5774 (asociación grande)
 
-Kruskal-Wallis (MONTO ~ CANAL): H=5.950,5, p=0,0000, eta^2=0,0018 (insignif.)
-Kruskal-Wallis (MONTO ~ LOCAL): H=51.345,7, p=0,0000, eta^2=0,0156 (pequeño)
+Kruskal (MONTO~CANAL): H=5.950,5   eta^2=0,0018 (insignif.)
+Kruskal (MONTO~LOCAL): H=51.345,7  eta^2=0,0156 (pequeño)
 \end{verbatim}
 \vspace{0.4cm}
 
@@ -764,8 +771,8 @@ programa, obtenida con \texttt{CPYD\_SEED=42 python3 main.py data/ventas\_comple
 equipo de la Tabla~\ref{tab:entorno} (Apple M4, planificador \texttt{threads}). Sirve de
 \textit{prueba de ejecución}: los números del informe son la salida real y reproducible del
 pipeline, no valores inventados. Cada bloque se antecede de una explicación de \textit{qué
-demuestra}. Se omite una tabla de contingencia de 792 filas por brevedad; algunas tablas crudas de
-\texttt{pandas} son muy anchas y se muestran en cuerpo reducido.
+demuestra}. Se omite una tabla de contingencia de 792 filas por brevedad; las líneas muy anchas de
+la salida cruda se muestran cortadas con el símbolo $\hookrightarrow$ para no exceder el margen.
 
 \subsection*{Fase 1 --- Carga y Preprocesamiento (paralelo con Dask)}
 \textbf{Qué demuestra:} la semilla se fija desde \texttt{CPYD\_SEED}; el planificador activo es
@@ -775,8 +782,7 @@ edades} inválidas (mediana 49,9) y los descriptivos; se materializan \textbf{3.
 marcan \textbf{149.377 outliers} (IQR, 4,61\%). \texttt{UNIDADES} da asimetría/curtosis \texttt{NA}
 por varianza cero (esperado).
 
-{\scriptsize
-\begin{verbatim}
+\begin{Verbatim}[breaklines=true,breakanywhere=true,fontsize=\scriptsize,breaksymbolleft={\tiny\ensuremath{\hookrightarrow}}]
 ================================================================================
           SISTEMA DE ANÁLISIS ESTADÍSTICO Y MODELADO DE VENTAS
 ================================================================================
@@ -843,8 +849,7 @@ Estandarizando variables continuas: ['PORCENTAJE DESCUENTO', 'MONTO APLICADO', '
   FRECUENCIA CLIENTE: media=5.6542, desv_std=5.4562
 
 Preprocesamiento finalizado.
-\end{verbatim}
-}
+\end{Verbatim}
 
 
 \subsection*{Fase 2 --- Análisis Exploratorio (EDA)}
@@ -854,8 +859,7 @@ por el confinamiento online$=$LOCAL 1999), pero $\eta^2$ de MONTO por CANAL ($0{
 ($0{,}0156$) son insignificante/pequeño: con $N=3{,}2$M todo es ``significativo'', pero la magnitud
 práctica es baja. Fechas especiales: $p=0{,}217$ (rango-biserial $-0{,}102$), sin pico estacional.
 
-{\scriptsize
-\begin{verbatim}
+\begin{Verbatim}[breaklines=true,breakanywhere=true,fontsize=\scriptsize,breaksymbolleft={\tiny\ensuremath{\hookrightarrow}}]
 [Paso 2/4] Análisis exploratorio y visualizaciones...
 
 === 1) Estadística Descriptiva ===
@@ -956,8 +960,7 @@ Mann-Whitney U: U=7430.0, p-value=2.174172e-01
 Tamaño de efecto (rango-biserial): r=-0.1022 (magnitud pequeña)
 
 Análisis exploratorio finalizado. Visualizaciones guardadas en 'plots/'.
-\end{verbatim}
-}
+\end{Verbatim}
 
 
 \subsection*{Fase 3 --- Inferencia Estadística (5 hipótesis)}
@@ -966,8 +969,7 @@ Análisis exploratorio finalizado. Visualizaciones guardadas en 'plots/'.
 tamaños de efecto son insignificantes/pequeños (género $r=-0{,}047$; edad$\sim$frecuencia
 $\rho=0{,}127$; descuento$\sim$canal $\eta^2=0{,}005$): efectos reales de escasa relevancia práctica.
 
-{\scriptsize
-\begin{verbatim}
+\begin{Verbatim}[breaklines=true,breakanywhere=true,fontsize=\scriptsize,breaksymbolleft={\tiny\ensuremath{\hookrightarrow}}]
 [Paso 3/4] Inferencia estadística y pruebas de hipótesis...
 
 === Inferencia Estadística: Pruebas de Hipótesis ===
@@ -1002,8 +1004,7 @@ Hipótesis propia 3: el descuento promedio varía según el CANAL de compra.
   Kruskal-Wallis: H=16534.9211, p-value=0.000000e+00
   Tamaño de efecto (eta^2): 0.0051 (magnitud insignificante)
   Se rechaza H0 (p < 0.05): el efecto es estadísticamente significativo.
-\end{verbatim}
-}
+\end{Verbatim}
 
 
 \subsection*{Fase 4 --- Modelado Predictivo (Regresión OLS)}
@@ -1013,8 +1014,7 @@ $=0{,}1640$; RMSE $=13.220{,}88$; MAE $=6.291{,}93$. Diagnóstico: heterocedasti
 de residuos, independencia (Durbin-Watson $=1{,}999$) y \textbf{ausencia de multicolinealidad} (todos
 los VIF $\approx 1{,}00$): la matriz de diseño ya no es singular tras las exclusiones.
 
-{\scriptsize
-\begin{verbatim}
+\begin{Verbatim}[breaklines=true,breakanywhere=true,fontsize=\scriptsize,breaksymbolleft={\tiny\ensuremath{\hookrightarrow}}]
 [Paso 4/4] Ajuste y evaluación del modelo de regresión...
 
 === Modelado Predictivo: Regresión Lineal Múltiple (Opción A) ===
@@ -1059,8 +1059,7 @@ Validación en el conjunto de prueba (30%):
     CANAL_WEB: VIF=1.0024 (sin colinealidad)
     CANAL_CCT: VIF=1.0000 (sin colinealidad)
     CANAL_APP: VIF=1.0024 (sin colinealidad)
-\end{verbatim}
-}
+\end{Verbatim}
 
 
 \subsection*{Cierre --- Tiempos por Fase}
@@ -1070,8 +1069,7 @@ OLS $\sim$1,3 s). La diferencia con la Tabla~\ref{tab:fullpipe} ($\sim$18,4 s pa
 es esperada: el arnés de \textit{benchmark} omite la generación de figuras para aislar el costo de
 cómputo, mientras que esta ejecución de referencia sí produce todos los gráficos.
 
-{\scriptsize
-\begin{verbatim}
+\begin{Verbatim}[breaklines=true,breakanywhere=true,fontsize=\scriptsize,breaksymbolleft={\tiny\ensuremath{\hookrightarrow}}]
 ================================================================================
 PROCESAMIENTO COMPLETO FINALIZADO CON ÉXITO
 Planificador Dask (Paso 1): threads
@@ -1083,8 +1081,7 @@ Tiempos por fase (perf_counter):
 Tiempo total del pipeline: 19.69 segundos.
 Gráficos guardados en: /Users/aztellas/Documents/Trabajo-paralela-02/plots
 ================================================================================
-\end{verbatim}
-}
+\end{Verbatim}
 
 
 \end{document}
