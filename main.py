@@ -11,7 +11,7 @@ import warnings
 warnings.filterwarnings('ignore', category=RuntimeWarning,
                         message='invalid value encountered')
 
-from src.data_loader import DataLoader
+from src.data_loader import DataLoader, DataReadError
 from src.exploratory_analysis import ExploratoryAnalysis
 from src.inference_modeling import InferenceModeling
 from src.preprocessing import Preprocessor
@@ -87,28 +87,40 @@ def main():
 
     t_pipeline = time.perf_counter()
 
-    t0 = time.perf_counter()
-    print("\n[Paso 1/4] Preprocesamiento y limpieza de datos (paralelo con Dask)...")
-    preprocessor = Preprocessor(loader, seed=seed, scheduler='threads')
-    df_clean = preprocessor.run_preprocessing()
-    t_prep = time.perf_counter() - t0
+    # El pipeline se envuelve para que un fallo de lectura de datos (incluida la
+    # lectura diferida de Dask en .compute(), que es donde afloraría una condición
+    # de carrera TOCTOU) termine con un mensaje claro y código de salida 1, en
+    # lugar de una traza cruda. Los errores inesperados (bugs) sí se propagan.
+    try:
+        t0 = time.perf_counter()
+        print("\n[Paso 1/4] Preprocesamiento y limpieza de datos (paralelo con Dask)...")
+        preprocessor = Preprocessor(loader, seed=seed, scheduler='threads')
+        df_clean = preprocessor.run_preprocessing()
+        t_prep = time.perf_counter() - t0
 
-    t0 = time.perf_counter()
-    print("\n[Paso 2/4] Análisis exploratorio y visualizaciones...")
-    analysis = ExploratoryAnalysis(df_clean, seed=seed)
-    analysis.run_all()
-    t_eda = time.perf_counter() - t0
+        t0 = time.perf_counter()
+        print("\n[Paso 2/4] Análisis exploratorio y visualizaciones...")
+        analysis = ExploratoryAnalysis(df_clean, seed=seed)
+        analysis.run_all()
+        t_eda = time.perf_counter() - t0
 
-    t0 = time.perf_counter()
-    print("\n[Paso 3/4] Inferencia estadística y pruebas de hipótesis...")
-    model = InferenceModeling(df_clean, seed=seed)
-    model.run_hypothesis_tests()
-    t_inf = time.perf_counter() - t0
+        t0 = time.perf_counter()
+        print("\n[Paso 3/4] Inferencia estadística y pruebas de hipótesis...")
+        model = InferenceModeling(df_clean, seed=seed)
+        model.run_hypothesis_tests()
+        t_inf = time.perf_counter() - t0
 
-    t0 = time.perf_counter()
-    print("\n[Paso 4/4] Ajuste y evaluación del modelo de regresión...")
-    model.run_regression_modeling()
-    t_ols = time.perf_counter() - t0
+        t0 = time.perf_counter()
+        print("\n[Paso 4/4] Ajuste y evaluación del modelo de regresión...")
+        model.run_regression_modeling()
+        t_ols = time.perf_counter() - t0
+    except (DataReadError, OSError) as exc:
+        print("\n" + "=" * 80)
+        print("  EL PIPELINE SE DETUVO POR UN FALLO DE LECTURA DE DATOS:")
+        print(f"  {exc}")
+        print("  No se generaron resultados parciales silenciosos: se aborta con código 1.")
+        print("=" * 80)
+        sys.exit(1)
 
     elapsed = time.perf_counter() - t_pipeline
     print("\n" + "=" * 80)

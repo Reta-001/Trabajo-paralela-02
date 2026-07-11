@@ -1,13 +1,15 @@
-\documentclass[12pt,a4paper]{article}
+\documentclass[12pt,letterpaper]{article}
 
 % =========================================================================
 % PAQUETES BÁSICOS Y DISEÑO SOBRIO "HIGH-END"
 % =========================================================================
 \usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
 \usepackage[spanish,es-tabla,es-noshorthands]{babel}
 \usepackage{amsmath, amsthm, amssymb}
 \usepackage{graphicx}
-\usepackage[left=3cm, right=3cm, top=3cm, bottom=3cm, headheight=25pt]{geometry}
+% Márgenes norma UTEM: superior/inferior 2,54 cm; izquierdo/derecho 3,17 cm; tamaño carta.
+\usepackage[letterpaper, top=2.54cm, bottom=2.54cm, left=3.17cm, right=3.17cm, headheight=25pt]{geometry}
 \usepackage{xcolor}
 \usepackage{tikz}
 \usetikzlibrary{babel, shapes.geometric, arrows.meta, positioning}
@@ -19,7 +21,9 @@
 \usepackage{tcolorbox}
 \usepackage{fvextra}   % verbatim con salto de línea (para la salida cruda del Anexo)
 \usepackage{hyperref}
-\usepackage{charter}
+\usepackage{mathptmx}  % Times New Roman (norma UTEM: fuente Times New Roman 12 pt)
+\usepackage{setspace}
+\onehalfspacing        % Interlineado 1,5 (norma UTEM)
 
 % Definición de paleta de colores sobria
 \definecolor{primary}{RGB}{15, 45, 80}
@@ -68,11 +72,17 @@
         \fill[secondary] (current page.north west) ++(2.75cm, -2.5cm) rectangle ++(1pt, -\paperheight+5cm);
     \end{tikzpicture}
 
-    \vspace*{0.2cm}
+    \vspace*{0.6cm}
     \begin{center}
-        \IfFileExists{image.png}{\includegraphics[width=4.5cm]{image.png}}{}
+        % Identificador Institucional UTEM (versión con acrónimo). Se aplica sin
+        % modificar (sin deformar, rotar, invertir ni recolorear), preservando la
+        % proporción (sólo se fija el ancho), sobre fondo blanco y con área de
+        % resguardo, conforme al Manual de Identidad Visual UTEM (2025).
+        \IfFileExists{UTEM_logo_con_acronimo.png}%
+            {\includegraphics[width=3cm]{UTEM_logo_con_acronimo.png}}%
+            {\IfFileExists{image.png}{\includegraphics[width=3cm]{image.png}}{}}
     \end{center}
-    \vspace*{0.5cm}
+    \vspace*{0.8cm}
     \begin{flushleft}
         \hspace*{1.8cm}
         \begin{minipage}{0.75\textwidth}
@@ -106,13 +116,23 @@
 
 \newpage
 
+\section*{Nota preliminar}
+\addcontentsline{toc}{section}{Nota preliminar}
+El presente informe fue redactado y diagramado siguiendo las normas de estilo y de identidad visual de la Universidad Tecnológica Metropolitana (UTEM): fuente Times New Roman de 12\,pt, interlineado de 1,5 líneas, tamaño de página carta, márgenes de 2,54\,cm (superior e inferior) y 3,17\,cm (izquierdo y derecho), uso de cursivas para extranjerismos, tecnicismos y énfasis, reserva de las negritas para los títulos, y sistema de citación de la American Psychological Association (APA). Estas convenciones se fundamentan en el \textit{Manual de estilo de publicaciones de Ediciones UTEM} y en el \textit{Manual de Identidad Visual UTEM} (Universidad Tecnológica Metropolitana, 2019, 2025), ambos consignados en la Sección~\ref{sec:referencias}, Referencias.
+
+\newpage
+
 \section{Descripción de la Solución Implementada}
 Para resolver el desafío de analizar el archivo \texttt{ventas\_completas.csv} (que contiene más de 3,2 millones de registros) de la cadena Cruz Morada, se implementó una solución computacional escalable utilizando procesamiento paralelo.
 
-\textbf{Justificación de la Técnica:} Dado que cargar un archivo tan masivo directamente a la memoria RAM con herramientas tradicionales (como \texttt{pandas}) provocaría colapsos por falta de memoria (Out-of-Memory), se optó por una lectura particionada o \textit{chunking}. La ejecución se realiza en bloques de 64\,MB, asignando cada partición lógica como una tarea independiente entre los \textbf{10 núcleos lógicos} (4 de rendimiento + 6 de eficiencia) del procesador Apple M4 del equipo de pruebas. El motor paralelo expone el planificador de Dask como parámetro configurable (\texttt{synchronous}, \texttt{threads}, \texttt{processes} y \texttt{distributed}/LocalCluster); la Sección~\ref{sec:benchmark} documenta la evaluación empírica que fundamenta la elección del planificador por defecto.
-Además, cumpliendo con la estricta política de reproducibilidad, se garantiza el determinismo del programa inyectando una semilla global mediante la variable de entorno \texttt{CPYD\_SEED=42}.
+\textbf{Justificación de la Técnica:} Dado que cargar un archivo tan masivo directamente a la memoria RAM con herramientas tradicionales (como \texttt{pandas}) provocaría colapsos por falta de memoria (Out-of-Memory), se optó por una lectura particionada o \textit{chunking}. La ejecución se realiza en bloques de 64\,MB, asignando cada partición lógica como una tarea independiente entre los \textit{10 núcleos lógicos} (4 de rendimiento + 6 de eficiencia) del procesador Apple M4 del equipo de pruebas. El número de \textit{workers} \textit{se deriva del hardware en tiempo de ejecución} (\texttt{multiprocessing.cpu\_count()}$=10$): no es una constante arbitraria ni ``hardcodeada'', sino que la solución se ajusta automáticamente al número de núcleos de la máquina donde se ejecute. El motor paralelo expone el planificador de Dask como parámetro configurable (\texttt{synchronous}, \texttt{threads}, \texttt{processes} y \texttt{distributed}/LocalCluster); la Sección~\ref{sec:benchmark} documenta la evaluación empírica que fundamenta la elección del planificador por defecto.
+Además, cumpliendo con la estricta política de reproducibilidad, se garantiza el determinismo del programa inyectando una semilla global mediante la variable de entorno \texttt{CPYD\_SEED=42}.\footnote{\textbf{Convención de notación numérica:} la redacción del informe usa la convención chilena (coma decimal, punto como separador de miles). Los bloques \texttt{verbatim} y el Anexo~\ref{sec:anexo} reproducen \textit{literalmente} la salida del programa, que emplea la notación por defecto de Python/NumPy (punto decimal); se preservan sin alterar para no falsear la evidencia de ejecución.}
 
 \textbf{Proyección de columnas (memoria y privacidad):} De las 15 columnas del archivo original, la lectura con Dask carga únicamente las 9 requeridas por el análisis (\texttt{FECHA}, \texttt{CANAL}, \texttt{UNIDADES}, \texttt{PORCENTAJE DESCUENTO}, \texttt{MONTO APLICADO}, \texttt{LOCAL}, \texttt{CODIGO CLIENTE}, \texttt{FECHA NACIMIENTO} y \texttt{GENERO}). Se descartan en la propia lectura \texttt{SKU}, \texttt{PRODUCTO}, \texttt{BOLETA}, \texttt{RUN CLIENTE}, \texttt{NOMBRES} y \texttt{APELLIDOS} por dos motivos: \textit{(i)} reducen el consumo de memoria y el tiempo de parseo, al no materializar columnas de texto pesadas ni identificadores no utilizados; y \textit{(ii)} \texttt{RUN CLIENTE}, \texttt{NOMBRES} y \texttt{APELLIDOS} son datos personales identificables, cuya exclusión minimiza el tratamiento de información sensible. El identificador \texttt{CODIGO CLIENTE} (UUID) se conserva sólo para calcular la frecuencia de compra por cliente y se elimina inmediatamente después de dicho cómputo. Adicionalmente, se declaran los tipos de dato explícitos por columna (p.\,ej. \texttt{Int32}, \texttt{Int8}, \texttt{category}, \texttt{float64}) para evitar la inferencia costosa y acotar la huella de memoria.
+
+\textbf{Robustez y manejo de errores.} La carga de datos adopta el patrón EAFP (\textit{intentar y manejar}) en lugar de confiar en una verificación previa: aunque la ruta se valida al inicio para dar retroalimentación temprana, la lectura efectiva —incluida la lectura diferida de Dask, que sólo ocurre en \texttt{.compute()}— se envuelve en manejo de excepciones. De este modo, si el archivo es eliminado, movido o corrompido \textit{entre} la verificación y la lectura (condición de carrera TOCTOU), el programa termina con un diagnóstico explícito y código de salida distinto de cero, en lugar de una traza cruda o —peor aún— una pérdida silenciosa de datos. La validación de columnas es deliberadamente \textit{tolerante}: mediante proyección se cargan sólo las columnas requeridas, por lo que columnas extra o reordenadas no interrumpen la ejecución; sólo se emite una advertencia (sin abortar) si faltara alguna columna esperada. Este diseño prioriza que el programa ``falle ruidosamente y de forma controlada'' o continúe cuando es seguro, evitando los dos anti-patrones de producción: el fallo silencioso y la rigidez excesiva.
+
+\textbf{Precisión numérica.} Todas las variables continuas (\texttt{PORCENTAJE DESCUENTO}, \texttt{MONTO APLICADO}, sus derivadas y las estandarizadas) se manejan en \texttt{float64} (doble precisión IEEE-754) en todo el \textit{pipeline}. Se prefiere \texttt{float64} sobre \texttt{float32} de forma deliberada: los contrastes de hipótesis y los coeficientes OLS acumulan operaciones sobre 3,2 millones de valores, régimen en el que la doble precisión evita la propagación de error de redondeo que sí degradaría a la simple precisión (y que comprometería la estabilidad de $p$-values y coeficientes). Los conteos e identificadores usan tipos enteros (\texttt{Int8}/\texttt{Int32}/\texttt{Int64}) por exactitud y economía de memoria.
 
 \section{Justificación de las Librerías Estadísticas Utilizadas}
 Para asegurar un rigor metodológico excepcional, se utilizaron las siguientes librerías de Python, consideradas estándares industriales en la ciencia de datos:
@@ -132,7 +152,7 @@ simplemente ``paralela''. Por ello, en lugar de asumir que el paralelismo garant
 se sometió el motor a una evaluación empírica rigurosa que compara cuatro planificadores de Dask
 sobre la fase de carga y preprocesamiento (la única etapa efectivamente paralelizada del
 \textit{pipeline}). Los hallazgos son deliberadamente autocríticos: revelan que la elección ingenua
-del planificador puede \textbf{degradar} el rendimiento por debajo del secuencial, y que la
+del planificador puede \textit{degradar} el rendimiento por debajo del secuencial, y que la
 aceleración real exige entender la tensión entre el \textit{GIL} de Python y el costo de la
 comunicación entre procesos (IPC).
 
@@ -209,7 +229,7 @@ Se resaltan en \textbf{negrita} el mejor tiempo total y las sub-fases donde el p
 
 \noindent Consumo de recursos (peor caso entre ejecuciones): la memoria máxima del sistema osciló
 entre 5,98 y 7,08\,GB de los 16\,GB disponibles, y el envío a \textit{swap} nunca superó los
-6,8\,MB en \textbf{ninguna} configuración. Esto \textbf{descarta} que la lentitud de
+6,8\,MB en \textit{ninguna} configuración. Esto \textit{descarta} que la lentitud de
 \texttt{processes} se deba a paginación por falta de memoria: el sobrecosto es genuinamente de
 serialización (IPC).
 
@@ -222,22 +242,22 @@ serialización (IPC).
     \textit{GIL}. Los \textit{workers} comparten memoria, por lo que no hay costo de serialización.
 
     \item \textbf{Procesos (\texttt{processes}) — 0,36$\times$ (regresión):} contraintuitivamente,
-    el paralelismo ``real'' resultó casi \textbf{tres veces más lento} que el baseline secuencial.
+    el paralelismo ``real'' resultó casi \textit{tres veces más lento} que la línea base secuencial.
     La descomposición localiza el problema con precisión: las \textit{reducciones intermedias} se
-    disparan de $\sim$13 a \textbf{38,75\,s} y la \textit{materialización final} de 0,68 a
-    \textbf{9,71\,s}. Bajo \texttt{spawn}, cada una de las ocho llamadas a \texttt{.compute()}
+    disparan de $\sim$13 a \textit{38,75\,s} y la \textit{materialización final} de 0,68 a
+    \textit{9,71\,s}. Bajo \texttt{spawn}, cada una de las ocho llamadas a \texttt{.compute()}
     obliga a serializar (\textit{pickle}) los datos a través de las fronteras de proceso, y el
     volcado final de 3,2M filas al proceso principal debe empaquetarse por completo. Como el
-    \textit{swap} es nulo, se confirma que se trata de un cuello de botella de \textbf{IPC}, no de
+    \textit{swap} es nulo, se confirma que se trata de un cuello de botella de \textit{IPC}, no de
     memoria.
 
     \item \textbf{LocalCluster (\texttt{distributed}) — hasta 5$\times$ más rápido que
     \texttt{processes}:} el planificador distribuido recupera el paralelismo por procesos. Es
     3,10$\times$ más rápido que \texttt{processes} en promedio y alcanza $\sim$10,7\,s en régimen
-    estacionario (ejecuciones 2 y 3), es decir 1,81$\times$ sobre el baseline: el mejor resultado
+    estacionario (ejecuciones 2 y 3), es decir 1,81$\times$ sobre la línea base: el mejor resultado
     absoluto. La clave es que construye el \textit{pool} una sola vez y \texttt{persist()} mantiene
     las particiones \textit{residentes en los workers} (persist de 1,37\,s frente a 4,90\,s), de modo
-    que las reducciones intermedias caen a 7,31\,s, \textbf{incluso por debajo del secuencial}. Su
+    que las reducciones intermedias caen a 7,31\,s, \textit{incluso por debajo del secuencial}. Su
     costo es un \textit{setup} de 2,32\,s y una primera materialización más costosa (la varianza alta
     de la Tabla~\ref{tab:benchmark} proviene de la ejecución 1, con un \textit{gather} inicial de
     21,4\,s que se estabiliza en $\sim$2,1\,s en las siguientes).
@@ -284,13 +304,13 @@ la variabilidad térmica/de carga de la máquina entre ejecuciones (hasta $\sim$
 
 \noindent\textbf{Integridad numérica.} El arnés extrae 26 métricas del \textit{pipeline} (conteos de
 filas/outliers/clientes, estadísticos descriptivos, $p$-values, estadísticos de prueba y coeficientes
-OLS) y las contrasta contra los valores de referencia. El resultado es \textbf{26/26 coincidencias
+OLS) y las contrasta contra los valores de referencia. El resultado es \textit{26/26 coincidencias
 (0 fallos, 0 faltantes) en las tres configuraciones} de planificador, con tolerancia relativa
 $<10^{-3}$. Esto demuestra que cambiar el modelo de ejecución (secuencial, hilos o procesos) no altera
 ni un solo resultado analítico: la paralelización es correcta, no sólo rápida.
 
 \noindent\textbf{Determinismo.} Dos ejecuciones adicionales bajo \texttt{processes} con la misma semilla
-produjeron \textbf{37/37 salidas idénticas} bit a bit (0 divergencias). Esto confirma empíricamente la
+produjeron \textit{37/37 salidas idénticas} bit a bit (0 divergencias). Esto confirma empíricamente la
 propiedad discutida en la Sección~\ref{sec:benchmark}: aunque bajo \texttt{spawn} los \textit{workers}
 no heredan la semilla, el resultado es determinista porque toda la aleatoriedad reside en el proceso
 principal tras \texttt{.compute()}.
@@ -331,7 +351,7 @@ salida.
 \subsection{Conclusión y Planificador Seleccionado}
 Para esta carga de trabajo \textit{memory-bound} (tablas densas que caben en RAM, en una sola
 máquina de 10 núcleos), el planificador \texttt{threads} ofrece el mejor equilibrio entre velocidad
-y robustez (1,30$\times$ estable, sin sobrecosto de arranque) y es, por ello, el \textbf{planificador
+y robustez (1,30$\times$ estable, sin sobrecosto de arranque) y es, por ello, el \textit{planificador
 por defecto de la solución entregada}. El planificador \texttt{processes} se descarta explícitamente
 por su regresión de rendimiento. \texttt{LocalCluster} se documenta como la vía de escalamiento
 correcta: es el más rápido en régimen estacionario y sería la elección obligada si el conjunto
@@ -380,13 +400,13 @@ prueba de independencia con LOCAL.
 
 \textbf{Justificación:} Se evaluó la posible dependencia de los valores nulos frente a las variables \texttt{CANAL} y \texttt{LOCAL}. Al igual que con el porcentaje de descuento, se demostró mediante conteo paralelo en toda la base de datos (3.242.878 registros) que la tasa de nulos verdaderos (ausencia de registro, `NaN`) en la \texttt{FECHA NACIMIENTO} es exactamente del $0,0\%$. Dado que no existen verdaderos nulos iniciales en la columna, el test estadístico de mecanismo MCAR vs MAR/MNAR es inherentemente inaplicable por falta de varianza en la condición de nulidad. 
 
-Es imperativo distinguir conceptualmente este análisis de nulidad estructural del tratamiento de validación de dominio (outliers lógicos). Las 2.876 edades lógicamente inválidas (ej. $< 0$ o $> 110$ años) identificadas y corregidas posteriormente en la Fase 1 \textbf{no son registros nulos (missing values)} ni responden a un mecanismo de pérdida dependiente, sino a inconsistencias de digitación o fallas en sistemas heredados que contenían fechas espurias (ej. 1900-01-01). Dado que el problema original no es un fenómeno estadístico de datos faltantes, sino un problema aislado de limpieza de atípicos sobre registros que sí existían, el uso del test MCAR no aplica, y la imputación posterior vía mediana resulta en una aproximación robusta a un problema de ruido, sin el requerimiento de estratificación por canal o local.
+Es imperativo distinguir conceptualmente este análisis de nulidad estructural del tratamiento de validación de dominio (outliers lógicos). Las 2.876 edades lógicamente inválidas (ej. $< 0$ o $> 110$ años) identificadas y corregidas posteriormente en la Fase 1 \textit{no son registros nulos (missing values)} ni responden a un mecanismo de pérdida dependiente, sino a inconsistencias de digitación o fallas en sistemas heredados que contenían fechas espurias (ej. 1900-01-01). Dado que el problema original no es un fenómeno estadístico de datos faltantes, sino un problema aislado de limpieza de atípicos sobre registros que sí existían, el uso del test MCAR no aplica, y la imputación posterior vía mediana resulta en una aproximación robusta a un problema de ruido, sin el requerimiento de estratificación por canal o local.
 
 \subsection{Transformación de Variables y Derivadas}
 De acuerdo a la rúbrica, se crearon nuevas variables a partir de los datos crudos:
 \begin{itemize}
     \item \textbf{\texttt{EDAD}:} Se calculó restando la \texttt{FECHA NACIMIENTO} a la \texttt{FECHA} de la transacción. Durante este proceso, los valores nulos en la fecha de nacimiento original, sumados a fechas lógicamente inconsistentes (definidas estrictamente como resultar en una edad $< 0$ o edad $> 110$ años), produjeron 2.876 registros atípicos. Estos fueron imputados limpiamente por la mediana global (49,9 años) calculada en paralelo.
-    \item \textbf{\texttt{FRECUENCIA CLIENTE}:} Se calculó mediante un conteo de boletas agrupado por \texttt{CODIGO CLIENTE}, luego distribuido (broadcast) a todo el dataframe.
+    \item \textbf{\texttt{FRECUENCIA CLIENTE}:} Se calculó mediante un conteo de boletas agrupado por \texttt{CODIGO CLIENTE}, luego distribuido (\textit{broadcast}) a todo el \textit{dataframe}.
     \item \textbf{\texttt{MONTO POR UNIDAD}:} Se calculó como \texttt{MONTO APLICADO / UNIDADES}. Cabe destacar que, al analizar los datos descriptivos posteriormente, descubrimos que \texttt{UNIDADES} es siempre igual a $1$ en esta base de datos. Por ende, la variable derivada \texttt{MONTO POR UNIDAD} resulta ser un duplicado exacto del monto pagado, lo cual es útil confirmar empíricamente.
 \end{itemize}
 
@@ -460,7 +480,7 @@ MONTO APLICADO:
 \end{figure}
 
 \subsection{Análisis de Asociación}
-Dado que los datos no son normales, se descarta la Correlación de Pearson y se utiliza la \textbf{Correlación de Spearman} (basada en rangos).
+Dado que los datos no son normales, se descarta la Correlación de Pearson y se utiliza la \textit{Correlación de Spearman} (basada en rangos).
 
 \vspace{0.4cm}
 \noindent\textbf{Prueba de Correlación de Spearman:}
@@ -495,12 +515,12 @@ Kruskal (MONTO~LOCAL): H=51.345,7  eta^2=0,0156 (pequeño)
 $N=3{,}2$ millones de filas, prácticamente cualquier prueba rechaza H0 ($p\to 0$) por el mero tamaño
 muestral; el $p$-value deja de ser informativo. El estadístico Chi-cuadrado ($3.242.878$) es tan
 grande que iguala a $N$, pero un estadístico grande no equivale a un efecto fuerte. Por eso reportamos
-\textbf{tamaños de efecto}, que miden la magnitud real con independencia de $N$: la V de Cramér de
-$0{,}577$ indica una asociación \textbf{fuerte} (aunque no perfecta) entre \texttt{CANAL} y
+\textit{tamaños de efecto}, que miden la magnitud real con independencia de $N$: la V de Cramér de
+$0{,}577$ indica una asociación \textit{fuerte} (aunque no perfecta) entre \texttt{CANAL} y
 \texttt{LOCAL}, explicada estructuralmente por el confinamiento de los canales online en el local
 virtual 1999. En cambio, aunque el monto ``difiere significativamente'' por canal y local, el
 $\eta^2$ ($0{,}0018$ y $0{,}0156$) revela que esas
-diferencias explican \textbf{una fracción ínfima} de la variabilidad del ticket: significativas, pero
+diferencias explican \textit{una fracción ínfima} de la variabilidad del ticket: significativas, pero
 sin relevancia práctica.
 
 \textbf{Interpretación no técnica:}
@@ -536,19 +556,19 @@ Para evaluar empíricamente si las fechas comerciales más relevantes del calend
 
 Al validar algorítmicamente, se encontró que todas estas fechas comerciales caen dentro de la ventana global de 390 días de nuestra base de datos. El detalle de validación de las 10 fechas evaluadas en el rango es el siguiente:
 \begin{itemize}
-    \item \textbf{[EN RANGO]} Día de la Madre: 2024-05-12
-    \item \textbf{[EN RANGO]} Navidad (1): 2023-12-24
-    \item \textbf{[EN RANGO]} Navidad (2): 2023-12-25
-    \item \textbf{[EN RANGO]} Fiestas Patrias (1): 2024-09-18
-    \item \textbf{[EN RANGO]} Fiestas Patrias (2): 2024-09-19
-    \item \textbf{[EN RANGO]} Día del Niño: 2024-08-10
-    \item \textbf{[EN RANGO]} Cyber Day (1): 2024-06-03
-    \item \textbf{[EN RANGO]} Cyber Day (2): 2024-06-04
-    \item \textbf{[EN RANGO]} Cyber Day (3): 2024-06-05
-    \item \textbf{[EN RANGO]} Black Friday: 2023-11-24
+    \item \textit{[EN RANGO]} Día de la Madre: 2024-05-12
+    \item \textit{[EN RANGO]} Navidad (1): 2023-12-24
+    \item \textit{[EN RANGO]} Navidad (2): 2023-12-25
+    \item \textit{[EN RANGO]} Fiestas Patrias (1): 2024-09-18
+    \item \textit{[EN RANGO]} Fiestas Patrias (2): 2024-09-19
+    \item \textit{[EN RANGO]} Día del Niño: 2024-08-10
+    \item \textit{[EN RANGO]} Cyber Day (1): 2024-06-03
+    \item \textit{[EN RANGO]} Cyber Day (2): 2024-06-04
+    \item \textit{[EN RANGO]} Cyber Day (3): 2024-06-05
+    \item \textit{[EN RANGO]} Black Friday: 2023-11-24
 \end{itemize}
 
-Se generó entonces una ventana comparativa de $\pm 7$ días alrededor de cada fecha detectada. Sin embargo, para evitar que la planicie de bajo volumen al inicio de la serie (finales de 2023 y principios de 2024, atribuida a aperturas progresivas de sucursales) distorsione el promedio base "Normal" a la baja, se excluyó dicho periodo de rampa del test estadístico. \textbf{El corte del 1 de marzo de 2024 se determinó observando el punto exacto en el componente de tendencia de la descomposición estacional (Figura~\ref{fig:decomposicion}) donde el volumen diario se estabiliza por encima del sub-registro inicial.} Esta exclusión delimita el análisis estrictamente al rango del \textbf{01-03-2024 al 02-12-2024} (lo cual descarta del test a Black Friday 2023 y Navidad 2023). Esto consolida un total de 277 días analizables, desglosados en 63 días válidos en la ventana "Especial" frente a 214 días "Normales".
+Se generó entonces una ventana comparativa de $\pm 7$ días alrededor de cada fecha detectada. Sin embargo, para evitar que la planicie de bajo volumen al inicio de la serie (finales de 2023 y principios de 2024, atribuida a aperturas progresivas de sucursales) distorsione el promedio base "Normal" a la baja, se excluyó dicho periodo de rampa del test estadístico. \textbf{El corte del 1 de marzo de 2024 se determinó observando el punto exacto en el componente de tendencia de la descomposición estacional (Figura~\ref{fig:decomposicion}) donde el volumen diario se estabiliza por encima del sub-registro inicial.} Esta exclusión delimita el análisis estrictamente al rango del \textit{01-03-2024 al 02-12-2024} (lo cual descarta del test a Black Friday 2023 y Navidad 2023). Esto consolida un total de 277 días analizables, desglosados en 63 días válidos en la ventana "Especial" frente a 214 días "Normales".
 
 \vspace{0.4cm}
 \noindent\textbf{Análisis de Medias y Prueba de Mann-Whitney U:}
@@ -564,7 +584,7 @@ Tamaño de efecto (rango-biserial): r=-0,1022 (magnitud pequeña)
 \end{verbatim}
 \vspace{0.4cm}
 
-\textbf{Interpretación no técnica:} Al comparar las ventas diarias dentro de la ventana de festividades contra el resto del año (descartando el periodo inicial inestable para mayor rigurosidad), se observa que la mediana y el promedio de ventas son superiores durante las fechas comerciales. Sin embargo, la varianza intrínseca de las ventas diarias es muy alta. La prueba no paramétrica de Mann-Whitney U arroja un p-value de $0,217$ ($> 0,05$), lo que significa que fallamos en rechazar la hipótesis nula: \textbf{no existe una diferencia estadísticamente significativa} entre el volumen de ventas de las ventanas comerciales y el resto del año consolidado. Esto confirma que las ventas de Cruz Morada, fuertemente ancladas en demandas de salud inelásticas, no logran un diferencial estadísticamente distinguible atribuible al retail masivo de estas fechas, descartando un pico estacional anómalo. Se adjunta el gráfico comparativo donde se delimita la exclusión del periodo de rampa en azul y se marcan en rojo las ventanas evaluadas.
+\textbf{Interpretación no técnica:} Al comparar las ventas diarias dentro de la ventana de festividades contra el resto del año (descartando el periodo inicial inestable para mayor rigurosidad), se observa que la mediana y el promedio de ventas son superiores durante las fechas comerciales. Sin embargo, la varianza intrínseca de las ventas diarias es muy alta. La prueba no paramétrica de Mann-Whitney U arroja un p-value de $0,217$ ($> 0,05$), lo que significa que fallamos en rechazar la hipótesis nula: \textit{no existe una diferencia estadísticamente significativa} entre el volumen de ventas de las ventanas comerciales y el resto del año consolidado. Esto confirma que las ventas de Cruz Morada, fuertemente ancladas en demandas de salud inelásticas, no logran un diferencial estadísticamente distinguible atribuible al retail masivo de estas fechas, descartando un pico estacional anómalo. Se adjunta el gráfico comparativo donde se delimita la exclusión del periodo de rampa en azul y se marcan en rojo las ventanas evaluadas.
 
 \begin{figure}[H]
     \centering
@@ -575,37 +595,37 @@ Tamaño de efecto (rango-biserial): r=-0,1022 (magnitud pequeña)
 \section{Fase 3: Inferencia Estadística}
 Se pusieron a prueba cinco aseveraciones de negocio.
 
-\textbf{1. ¿El ticket promedio (MONTO APLICADO) en APP es mayor que en WEB?}
+\textit{1. ¿El ticket promedio (MONTO APLICADO) en APP es mayor que en WEB?}
 \begin{itemize}
     \item \textbf{Prueba:} Mann-Whitney U (p-value = 0,3603); tamaño de efecto rango-biserial $r=-0,001$ (insignificante).
     \item \textbf{Interpretación no técnica:} Dado que $0,36 > 0,05$, no rechazamos H0. No hay evidencia estadística de que un canal deje mayores tickets que el otro; el tamaño de efecto nulo lo confirma. La diferencia aparente es azar de la muestra.
 \end{itemize}
 
-\textbf{2. ¿El \% de descuento afecta las unidades vendidas?}
+\textit{2. ¿El \% de descuento afecta las unidades vendidas?}
 \begin{itemize}
     \item \textbf{Interpretación no técnica:} Imposible de calcular estadísticamente, puesto que todo cliente en esta base de datos compró exactamente 1 unidad (varianza nula). La regresión matemática se degenera.
 \end{itemize}
 
-\textbf{3. (H. Propia 1) ¿El ticket promedio difiere según el GÉNERO?}
+\textit{3. (H. Propia 1) ¿El ticket promedio difiere según el GÉNERO?}
 \begin{itemize}
-    \item \textbf{Prueba:} Mann-Whitney U (p-value = 0,0000); tamaño de efecto rango-biserial $r=-0,047$ (\textbf{insignificante}).
-    \item \textbf{Interpretación no técnica:} Se rechaza H0 ($p < 0,05$): los clientes masculinos registran tickets levemente más altos (\$10.698) que las clientas femeninas (\$9.929). \textbf{Matiz clave:} con $N=3{,}2$M el $p$-value es prácticamente $0$ por el tamaño muestral, pero el tamaño de efecto ($r=-0,047$) muestra que la diferencia, aunque real, es \textbf{prácticamente despreciable}.
+    \item \textbf{Prueba:} Mann-Whitney U (p-value = 0,0000); tamaño de efecto rango-biserial $r=-0,047$ (\textit{insignificante}).
+    \item \textbf{Interpretación no técnica:} Se rechaza H0 ($p < 0,05$): los clientes masculinos registran tickets levemente más altos (\$10.698) que las clientas femeninas (\$9.929). \textbf{Matiz clave:} con $N=3{,}2$M el $p$-value es prácticamente $0$ por el tamaño muestral, pero el tamaño de efecto ($r=-0,047$) muestra que la diferencia, aunque real, es \textit{prácticamente despreciable}.
 \end{itemize}
 
-\textbf{4. (H. Propia 2) ¿La edad está relacionada con la frecuencia de compra?}
+\textit{4. (H. Propia 2) ¿La edad está relacionada con la frecuencia de compra?}
 \begin{itemize}
     \item \textbf{Prueba:} Correlación de Spearman ($\rho=0,127$, p-value = 0,0000); el propio $\rho$ es el tamaño de efecto (magnitud pequeña).
     \item \textbf{Interpretación no técnica:} Se rechaza H0 ($p < 0,05$). A mayor edad del cliente hay mayor propensión a visitar la farmacia más veces, aunque la asociación es débil ($\rho=0,127$).
 \end{itemize}
 
-\textbf{5. (H. Propia 3) ¿El nivel de descuento otorgado varía según el CANAL (POS, APP, WEB)?}
+\textit{5. (H. Propia 3) ¿El nivel de descuento otorgado varía según el CANAL (POS, APP, WEB)?}
 \begin{itemize}
     \item \textbf{Prueba:} Kruskal-Wallis (p-value = 0,0000); tamaño de efecto $\eta^2=0,005$ (insignificante).
     \item \textbf{Interpretación no técnica:} Se rechaza H0 ($p < 0,05$): la política de descuentos depende del canal de ingreso. No obstante, el $\eta^2$ indica que el canal explica una fracción mínima de la variación del descuento.
 \end{itemize}
 
 \section{Fase 4: Modelado Predictivo (Regresión OLS)}
-Se empleó el modelo de \textbf{Opción A (Regresión Lineal Múltiple)} para predecir el \texttt{MONTO APLICADO}. El modelo final es \texttt{MONTO $\sim$ PORCENTAJE DESCUENTO + CANAL}. De los cuatro predictores sugeridos por la rúbrica se excluyeron dos, con justificación estadística: \texttt{UNIDADES} (constante, varianza cero: perfectamente colineal con el intercepto) y \texttt{LOCAL} (identificador nominal de alta cardinalidad y, además, estructuralmente colineal con \texttt{CANAL} —los canales online se registran en un único local virtual—, lo que vuelve singular la matriz de diseño). Ambas exclusiones y su diagnóstico se detallan en la Sección~\ref{sec:dificultades}; el efecto categórico de \texttt{LOCAL} sobre el monto ya quedó caracterizado en el EDA (Kruskal-Wallis, $\eta^2=0{,}0156$). El conjunto se dividió 70\% Entrenamiento y 30\% Prueba.
+Se empleó el modelo de \textit{Opción A (Regresión Lineal Múltiple)} para predecir el \texttt{MONTO APLICADO}. El modelo final es \texttt{MONTO $\sim$ PORCENTAJE DESCUENTO + CANAL}. De los cuatro predictores sugeridos por la rúbrica se excluyeron dos, con justificación estadística: \texttt{UNIDADES} (constante, varianza cero: perfectamente colineal con el intercepto) y \texttt{LOCAL} (identificador nominal de alta cardinalidad y, además, estructuralmente colineal con \texttt{CANAL} —los canales online se registran en un único local virtual—, lo que vuelve singular la matriz de diseño). Ambas exclusiones y su diagnóstico se detallan en la Sección~\ref{sec:dificultades}; el efecto categórico de \texttt{LOCAL} sobre el monto ya quedó caracterizado en el EDA (Kruskal-Wallis, $\eta^2=0{,}0156$). El conjunto se dividió 70\% Entrenamiento y 30\% Prueba.
 
 \vspace{0.4cm}
 \noindent\textbf{Coeficientes de la Regresión OLS (Datos no estandarizados):}
@@ -623,7 +643,7 @@ CANAL_APP              -1.683,88      76,34        -22,058    0,000
 \textbf{Interpretación de Coeficientes en el Negocio:}
 Al utilizar deliberadamente los datos en bruto (sin estandarizar), la regresión permite traducir los coeficientes directamente a pesos chilenos:
 \begin{itemize}
-    \item \textbf{Descuento:} manteniendo el canal constante, pasar de $0\%$ a $100\%$ de descuento se asocia a un aumento de $\$54.320$ CLP en el monto. Esta aparente paradoja (más descuento, más monto) es \textbf{correlacional, no causal}: los mayores descuentos absolutos se aplican a medicamentos de especialidad cuyo precio base es muy alto. El intercepto ($-\$11.070$) no es interpretable de forma aislada (equivaldría a extrapolar a descuento $0\%$); evaluado en el descuento medio ($0,392$) reproduce el ticket promedio observado ($\sim\$10.180$).
+    \item \textbf{Descuento:} manteniendo el canal constante, pasar de $0\%$ a $100\%$ de descuento se asocia a un aumento de $\$54.320$ CLP en el monto. Esta aparente paradoja (más descuento, más monto) es \textit{correlacional, no causal}: los mayores descuentos absolutos se aplican a medicamentos de especialidad cuyo precio base es muy alto. El intercepto ($-\$11.070$) no es interpretable de forma aislada (equivaldría a extrapolar a descuento $0\%$); evaluado en el descuento medio ($0,392$) reproduce el ticket promedio observado ($\sim\$10.180$).
     \item \textbf{Canal:} el canal base (intercepto) es \texttt{POS} (presencial). Todos los canales reducen el ticket relativo al POS: \texttt{WEB} $-\$668,77$, \texttt{APP} $-\$1.683,88$ y \texttt{CCT} (Call Center) $-\$2.600,82$. \texttt{CCT} exhibe la mayor reducción pero también el mayor error estándar ($1.082,15$), coherente con su volumen marginal (226 transacciones).
     \item \textbf{Predictores excluidos:} \texttt{UNIDADES} (constante) y \texttt{LOCAL} (nominal y colineal con \texttt{CANAL}) se excluyeron \textit{a priori} por las razones detalladas en la Sección~\ref{sec:dificultades}. Gracias a ello la matriz de diseño es no singular y todos los VIF resultan $\approx 1{,}0$ (sin artefactos de seudoinversa).
 \end{itemize}
@@ -665,7 +685,7 @@ El modelo falla gravemente en cumplir los supuestos OLS clásicos. La heteroceda
     \end{minipage}
 \end{figure}
 
-El único supuesto que se cumple perfectamente es la \textbf{Ausencia de Multicolinealidad}.
+El único supuesto que se cumple perfectamente es la \textit{Ausencia de Multicolinealidad}.
 \vspace{0.4cm}
 \noindent\textbf{Factor de Inflación de Varianza (VIF):}
 \begin{verbatim}
@@ -680,8 +700,8 @@ El único supuesto que se cumple perfectamente es la \textbf{Ausencia de Multico
 \subsection{Interpretación Crítica y Extrapolabilidad}
 El modelo presenta un $R^2$ ajustado muy pobre (0,1645 en entrenamiento; el $R^2$ sobre el conjunto de prueba es 0,1640), explicando apenas $\sim$16,4\% de la varianza del ticket final, con un error absoluto medio (MAE) de \$6.291,93 CLP.
 
-\textbf{¿El modelo es extrapolable?} 
-No. El modelo es puramente descriptivo básico y sufre de \textbf{omisión de variables críticas}. Intentar predecir el total a pagar utilizando si compró en la APP o el POS, ignorando la variable de negocio de mayor peso físico (el \textbf{precio base o SKU} de los medicamentos), produce coeficientes estadísticamente sesgados. Este error de diseño genera la ruptura generalizada de los supuestos visualizada en los residuales, imposibilitando la extrapolación causal de los hallazgos al negocio real.
+\textit{¿El modelo es extrapolable?} 
+No. El modelo es puramente descriptivo básico y sufre de \textit{omisión de variables críticas}. Intentar predecir el total a pagar utilizando si compró en la APP o el POS, ignorando la variable de negocio de mayor peso físico (el \textit{precio base o SKU} de los medicamentos), produce coeficientes estadísticamente sesgados. Este error de diseño genera la ruptura generalizada de los supuestos visualizada en los residuales, imposibilitando la extrapolación causal de los hallazgos al negocio real.
 
 \section{Síntesis de Resultados (Cuadro de Mando)}
 \label{sec:dashboard}
@@ -698,21 +718,21 @@ una lectura rápida.
 \toprule
 \textbf{Métrica} & \textbf{Valor} & \textbf{Lectura} \\
 \midrule
-\multicolumn{3}{l}{\textit{\textbf{Fase 1 --- Datos y Preprocesamiento}}} \\
+\multicolumn{3}{l}{\textbf{Fase 1 --- Datos y Preprocesamiento}} \\
 Registros procesados & 3.242.878 $\times$ 9 col. & carga particionada (Dask) \\
 Clientes únicos & 1.183.242 & frecuencia por cliente \\
 Nulos reales (DESCUENTO, F.\,NAC.) & 0,00\% & imputación preventiva \\
 Edades inválidas imputadas & 2.876 (mediana 49,9) & ruido, no ``missing'' \\
 Outliers de MONTO (IQR) & 149.377 (4,61\%) & se marcan, no se eliminan \\
 \midrule
-\multicolumn{3}{l}{\textit{\textbf{Fase 2 --- Exploratorio (EDA)}} \; \footnotesize(magnitud práctica vía tamaño de efecto)} \\
+\multicolumn{3}{l}{\textbf{Fase 2 --- Exploratorio (EDA)} \; \footnotesize(magnitud práctica vía tamaño de efecto)} \\
 Normalidad de MONTO (Shapiro) & $p = 2{,}9\times10^{-84}$ & no normal $\Rightarrow$ Spearman \\
 MONTO $\sim$ DESCUENTO (Spearman) & $\rho \approx 0{,}48$ & asociación positiva (media) \\
 CANAL $\sim$ LOCAL (Chi$^2$) & V de Cramér $=0{,}577$ & dependientes (asoc.\ grande) \\
 MONTO $\sim$ CANAL (Kruskal) & $H=5.950{,}5$; $\eta^2=0{,}0018$ & difiere; efecto \textbf{insignificante} \\
 MONTO $\sim$ LOCAL (Kruskal) & $H=51.345{,}7$; $\eta^2=0{,}0156$ & difiere; efecto pequeño \\
 \midrule
-\multicolumn{3}{l}{\textit{\textbf{Fase 3 --- Inferencia (5 hipótesis)}}} \\
+\multicolumn{3}{l}{\textbf{Fase 3 --- Inferencia (5 hipótesis)}} \\
 H1: APP $>$ WEB (Mann-Whitney) & $p=0{,}360$; $r=-0{,}001$ & no se rechaza \\
 H2: DESCUENTO $\to$ UNIDADES & degenerada & UNIDADES $\equiv 1$ \\
 Propia 1: GÉNERO (Mann-Whitney) & $p<0{,}001$; $r=-0{,}047$ & se rechaza, pero efecto insignif. \\
@@ -720,13 +740,13 @@ Propia 2: EDAD $\sim$ FREC. (Spearman) & $\rho=0{,}127$, $p<0{,}001$ & se rechaz
 Propia 3: DESCUENTO $\sim$ CANAL (Kruskal) & $H\approx16.535$; $\eta^2=0{,}005$ & se rechaza; efecto insignif. \\
 Fechas especiales (Mann-Whitney) & $p=0{,}217$; $r=-0{,}102$ & sin pico estacional \\
 \midrule
-\multicolumn{3}{l}{\textit{\textbf{Fase 4 --- Modelo OLS} (\texttt{MONTO $\sim$ DESCUENTO + CANAL})}} \\
+\multicolumn{3}{l}{\textbf{Fase 4 --- Modelo OLS} (\texttt{MONTO $\sim$ DESCUENTO + CANAL})} \\
 $R^2$ ajustado (train) / $R^2$ (test) & 0,1645 / 0,1640 & ajuste pobre \\
 RMSE / MAE & 13.220,88 / 6.291,93 & error elevado \\
 Breusch-Pagan / Shapiro (resid.) & $p<0{,}001$ / $p<0{,}001$ & heteroced.; no normal \\
 Durbin-Watson / VIF & 1,999 / $\approx 1{,}0$ & sin autocorr.; sin colinealidad \\
 \midrule
-\multicolumn{3}{l}{\textit{\textbf{Rendimiento y verificación (Sección~\ref{sec:benchmark})}}} \\
+\multicolumn{3}{l}{\textbf{Rendimiento y verificación (Sección~\ref{sec:benchmark})}} \\
 Mejor planificador & \texttt{threads}: 18,36\,s total & 1,27$\times$ en preprocesamiento \\
 \texttt{processes} / \texttt{LocalCluster} & 0,32$\times$ / óptimo estable & IPC vs.\ datos residentes \\
 Tamaño de partición óptimo & 64\,MB (61,81\,s) & vs.\ 32\,MB / 128\,MB \\
@@ -738,16 +758,51 @@ rendimiento. Cada valor se explica e interpreta en su sección respectiva.}
 \label{tab:dashboard}
 \end{table}
 
+\section{Alcances y Limitaciones}
+\label{sec:alcances}
+\textbf{Alcances.} Este trabajo entrega un \textit{pipeline} reproducible que consolida, limpia,
+caracteriza y modela el archivo único de 3,2 millones de transacciones de Cruz Morada en una sola
+máquina, con preprocesamiento paralelo (Dask) y análisis estadístico completo (descriptivo,
+inferencial y regresión). Está diseñado para el análisis \textit{batch} de un dataset estático: la
+carga es \textit{out-of-core} y el número de \textit{workers} se adapta al hardware, de modo que
+escala verticalmente al número de núcleos disponibles sin cambios de código. Todos los resultados son
+deterministas y verificables (Sección~\ref{sec:verificacion}).
+
+\textbf{Limitaciones.} Se declaran explícitamente los límites del estudio:
+\begin{itemize}
+    \item \textbf{Del modelo.} El OLS explica sólo el $\sim$16\% de la varianza del ticket
+    ($R^2=0{,}164$) y \textit{no es extrapolable causalmente}: omite la variable de mayor peso —el
+    \texttt{SKU}/precio base del producto—, ausente en el dataset. Sus residuos son heterocedásticos
+    y no normales, por lo que sirve como descripción, no como predictor de producción.
+    \item \textbf{De los datos.} \texttt{UNIDADES} es constante ($\equiv 1$), lo que impide evaluar
+    su efecto; \texttt{CANAL} y \texttt{LOCAL} están estructuralmente confundidos (canales online en
+    el local virtual 1999); y no se dispone de precio ni categoría de producto.
+    \item \textbf{Estadísticas.} Con $N=3{,}2$M el $p$-value pierde poder discriminante (casi todo es
+    ``significativo''); por ello se reportan tamaños de efecto, pero éstos revelan asociaciones en su
+    mayoría pequeñas. Las pruebas de normalidad se aplican sobre muestras ($n=5.000$) porque se
+    degradan con millones de filas.
+    \item \textbf{Computacionales.} La solución es de \textit{una sola máquina} y \textit{memory-bound}:
+    \texttt{threads} está acotado por el \textit{GIL} y \texttt{processes} por el IPC; escalar a
+    volúmenes que excedan la RAM o a múltiples nodos requeriría \texttt{LocalCluster}/Dask distribuido.
+    Los tiempos absolutos del \textit{benchmark} varían $\sim$10--15\% entre ejecuciones por estado
+    térmico/carga de la máquina (las razones de aceleración y la integridad son estables).
+    \item \textbf{De reproducibilidad.} El determinismo se garantiza vía \texttt{CPYD\_SEED}; bajo
+    \texttt{spawn} los \textit{workers} no heredan la semilla, pero esto no afecta el resultado porque
+    sus operaciones son deterministas y todo muestreo ocurre en el proceso principal (Sección~\ref{sec:benchmark}).
+\end{itemize}
+
 \section{Conclusiones y Recomendaciones de Negocio}
 \label{sec:conclusiones}
 Integrando los hallazgos de las cuatro fases, se extraen las siguientes conclusiones para Cruz Morada:
 
 \begin{itemize}
     \item \textbf{Demanda inelástica, sin estacionalidad comercial.} Las ventas no muestran un pico estadísticamente significativo en las fechas comerciales del calendario chileno (Mann-Whitney $p=0,217$; efecto pequeño $r=-0,10$). Es coherente con un negocio de salud: la demanda de medicamentos es relativamente inelástica y no sigue los ciclos del retail masivo. \textbf{Recomendación:} no sobreinvertir en campañas atadas a fechas comerciales; la serie sí exhibe fuerte autocorrelación (ACF), por lo que la planificación de inventario se beneficiaría más de un modelo de series de tiempo (ARIMA) que de calendarios promocionales.
-    \item \textbf{Diferencias reales pero prácticamente irrelevantes.} Género, canal y local arrojan diferencias ``altamente significativas'' ($p\to 0$) que, medidas por tamaño de efecto, son \textbf{insignificantes o pequeñas} ($r=-0,047$ para género; $\eta^2=0,0018$ y $0,0156$ para canal y local). El gran $N$ ($3,2$M) hace que casi todo sea significativo; la magnitud real es lo que importa para el negocio. \textbf{Recomendación:} no segmentar la estrategia de precios por género ni por canal esperando un impacto material en el ticket.
-    \item \textbf{El ticket lo gobierna el precio base del producto, no las variables disponibles.} El modelo OLS explica solo $\sim$16\% de la varianza del monto ($R^2=0,164$), con residuos heterocedásticos y no normales. La relación positiva descuento--monto es un \textbf{artefacto de confusión}: los mayores descuentos se aplican a medicamentos de especialidad de precio alto. \textbf{Recomendación:} para predecir o entender el ticket, incorporar la variable omitida de mayor peso —el \texttt{SKU}/precio base del producto—, ausente en este conjunto.
+    \item \textbf{Diferencias reales pero prácticamente irrelevantes.} Género, canal y local arrojan diferencias ``altamente significativas'' ($p\to 0$) que, medidas por tamaño de efecto, son \textit{insignificantes o pequeñas} ($r=-0,047$ para género; $\eta^2=0,0018$ y $0,0156$ para canal y local). El gran $N$ ($3,2$M) hace que casi todo sea significativo; la magnitud real es lo que importa para el negocio. \textbf{Recomendación:} no segmentar la estrategia de precios por género ni por canal esperando un impacto material en el ticket.
+    \item \textbf{El ticket lo gobierna el precio base del producto, no las variables disponibles.} El modelo OLS explica solo $\sim$16\% de la varianza del monto ($R^2=0,164$), con residuos heterocedásticos y no normales. La relación positiva descuento--monto es un \textit{artefacto de confusión}: los mayores descuentos se aplican a medicamentos de especialidad de precio alto. \textbf{Recomendación:} para predecir o entender el ticket, incorporar la variable omitida de mayor peso —el \texttt{SKU}/precio base del producto—, ausente en este conjunto.
     \item \textbf{Confusión estructural canal--local.} Los canales online se registran en un local virtual único (\texttt{LOCAL 1999}), lo que confunde canal y local (V de Cramér $0,577$). Es un aspecto a considerar en cualquier análisis futuro por tienda: el ``local'' online no es una sucursal física.
-    \item \textbf{Eficiencia computacional.} Para este volumen (dataset denso que cabe en RAM, una sola máquina de 10 núcleos), el planificador \texttt{threads} es el óptimo (1,3$\times$); el multiproceso ingenuo (\texttt{processes}) \textit{degrada} el rendimiento por IPC, y \texttt{LocalCluster} es la vía correcta de escalamiento a datos mayores o múltiples nodos. \textbf{Recomendación:} mantener \texttt{threads} en producción y migrar a \texttt{LocalCluster} solo si el volumen supera la memoria.
+    \item \textbf{Eficiencia computacional.} Para este volumen (\textit{dataset} denso que cabe en RAM, una sola máquina de 10 núcleos), el planificador \texttt{threads} es el óptimo (1,3$\times$); el multiproceso ingenuo (\texttt{processes}) \textit{degrada} el rendimiento por IPC, y \texttt{LocalCluster} es la vía correcta de escalamiento a datos mayores o múltiples nodos. \textbf{Recomendación:} mantener \texttt{threads} en producción y migrar a \texttt{LocalCluster} solo si el volumen supera la memoria.
+
+    \item \textbf{Aceleración por GPU: posible sólo con CUDA e innecesaria en este caso.} La aceleración por GPU de este flujo de \textit{dataframes} sólo es viable mediante CUDA —a través de RAPIDS cuDF—, que requiere una GPU NVIDIA (arquitectura Volta o superior) sobre Linux o WSL, y \textit{no está soportada en las GPU de Apple Silicon} ni en \textit{backends} Metal (RAPIDS, 2026). Aun disponiendo de ese hardware, la GPU no aportaría un beneficio que justifique su costo, por tres razones respaldadas por la literatura: \textit{(i)} las bibliotecas de \textit{dataframe} en GPU están diseñadas para conjuntos de escala masiva —el caso de referencia de NVIDIA es de mil millones de filas ($\sim$13\,GB)— (Kimball y Wendt, 2024), mientras que este conjunto (3,2 millones de filas, 635\,MB) cabe holgadamente en memoria y es unas 300 veces menor; \textit{(ii)} el cuello de botella medido es de entrada/salida y de transferencia de datos (IPC), no de cómputo, y las GPU aceleran cargas \textit{compute-bound}, no \textit{memory-bound} (Hennessy y Patterson, 2019): el costo de copiar los datos al dispositivo por el bus PCIe sólo se amortiza con volúmenes muy superiores (Kimball y Wendt, 2024); y \textit{(iii)} las fases de EDA, inferencia y modelado OLS son secuenciales y carecen de ruta en GPU, por lo que —por la ley de Amdahl (Amdahl, 1967)— acotan la aceleración total con independencia del acelerador empleado. \textbf{Recomendación:} descartar la GPU para este problema por ser sobreingeniería; reconsiderarla sólo si el volumen creciera en varios órdenes de magnitud (miles de millones de filas), escenario en el que RAPIDS cuDF sobre una GPU NVIDIA sería la opción indicada.
 \end{itemize}
 
 \section{Dificultades Encontradas y Solución de Problemas}
@@ -755,18 +810,39 @@ Integrando los hallazgos de las cuatro fases, se extraen las siguientes conclusi
 \begin{enumerate}
     \item \textbf{Desbordamiento de Memoria (OOM):} Al intentar cargar masivamente con \texttt{pandas}, el sistema colapsaba. \\ 
     \textit{Solución:} Implementar el motor \texttt{Dask DataFrame} con lectura lazy y particiones (chunks), procesando las 3,2M de filas en $\sim 15$ segundos con el planificador \texttt{threads} (véase la evaluación de rendimiento de la Sección~\ref{sec:benchmark}, que además demuestra por qué el planificador \texttt{processes} degradaría este tiempo a $\sim 61$\,s por sobrecosto de IPC).
-    \item \textbf{Matriz de diseño singular por dos fuentes de colinealidad (OLS).} Un primer diseño ingenuo del modelo, siguiendo literalmente la rúbrica (\texttt{MONTO $\sim$ DESCUENTO + UNIDADES + LOCAL + CANAL}), producía una matriz de diseño \textbf{singular} y coeficientes absurdos del orden de $10^{12}$ (artefacto de la seudoinversa de Moore-Penrose). El diagnóstico reveló \textbf{dos} fuentes independientes de colinealidad perfecta:
+    \item \textbf{Matriz de diseño singular por dos fuentes de colinealidad (OLS).} Un primer diseño ingenuo del modelo, siguiendo literalmente la rúbrica (\texttt{MONTO $\sim$ DESCUENTO + UNIDADES + LOCAL + CANAL}), producía una matriz de diseño \textit{singular} y coeficientes absurdos del orden de $10^{12}$ (artefacto de la seudoinversa de Moore-Penrose). El diagnóstico reveló \textit{dos} fuentes independientes de colinealidad perfecta:
     \begin{itemize}
         \item \texttt{UNIDADES} es constante ($\equiv 1$, varianza 0): es una copia del intercepto, por lo que es linealmente dependiente de \texttt{const}.
-        \item \texttt{LOCAL} está \textbf{estructuralmente confundido con \texttt{CANAL}}: el diagnóstico mostró que el indicador \texttt{LOCAL\_1999} es \textit{idéntico} a la suma de los indicadores de canal online (los coeficientes de seudoinversa aparecen con igual magnitud y signo opuesto, prueba de una dependencia lineal exacta). Esto revela que los canales online (\texttt{WEB}, \texttt{APP}, \texttt{CCT}) se registran en un único ``local virtual'' (\texttt{LOCAL 1999}), lo que es coherente con la alta V de Cramér ($0{,}577$) medida en el EDA.
+        \item \texttt{LOCAL} está \textit{estructuralmente confundido con \texttt{CANAL}}: el diagnóstico mostró que el indicador \texttt{LOCAL\_1999} es \textit{idéntico} a la suma de los indicadores de canal online (los coeficientes de seudoinversa aparecen con igual magnitud y signo opuesto, prueba de una dependencia lineal exacta). Esto revela que los canales online (\texttt{WEB}, \texttt{APP}, \texttt{CCT}) se registran en un único ``local virtual'' (\texttt{LOCAL 1999}), lo que es coherente con la alta V de Cramér ($0{,}577$) medida en el EDA.
     \end{itemize}
-    \textit{Solución:} en lugar de imputar valores de resguardo (que enmascararían el problema), se \textbf{excluyeron ambas variables de forma principiada}. \texttt{UNIDADES} no aporta varianza; \texttt{LOCAL} es nominal, de alta cardinalidad, colineal con \texttt{CANAL} en la dimensión online/físico y de efecto marginal pequeño ($\eta^2=0{,}0156$), por lo que su inclusión no compensa la pérdida de identificabilidad. El modelo final (\texttt{MONTO $\sim$ DESCUENTO + CANAL}) es no singular, con todos los VIF $\approx 1{,}0$ y coeficientes interpretables. El efecto de \texttt{LOCAL} sobre el monto queda documentado por separado en el EDA (Kruskal-Wallis, $\eta^2=0{,}0156$).
+    \textit{Solución:} en lugar de imputar valores de resguardo (que enmascararían el problema), se \textit{excluyeron ambas variables de forma principiada}. \texttt{UNIDADES} no aporta varianza; \texttt{LOCAL} es nominal, de alta cardinalidad, colineal con \texttt{CANAL} en la dimensión online/físico y de efecto marginal pequeño ($\eta^2=0{,}0156$), por lo que su inclusión no compensa la pérdida de identificabilidad. El modelo final (\texttt{MONTO $\sim$ DESCUENTO + CANAL}) es no singular, con todos los VIF $\approx 1{,}0$ y coeficientes interpretables. El efecto de \texttt{LOCAL} sobre el monto queda documentado por separado en el EDA (Kruskal-Wallis, $\eta^2=0{,}0156$).
 \end{enumerate}
+
+\section{Referencias}
+\label{sec:referencias}
+{\raggedright\setlength{\parindent}{-1.27cm}\setlength{\leftskip}{1.27cm}\setlength{\parskip}{6pt}
+
+Amdahl, G. M. (1967). Validity of the single processor approach to achieving large scale computing capabilities. En \textit{Proceedings of the April 18--20, 1967, Spring Joint Computer Conference (AFIPS '67)} (pp. 483--485). \url{https://doi.org/10.1145/1465482.1465560}\par
+Dask Development Team. (2016). \textit{Dask: Library for dynamic task scheduling} [Software]. \url{https://dask.org}\par
+Harris, C. R., Millman, K. J., van der Walt, S. J., Gommers, R., Virtanen, P., Cournapeau, D., et al. (2020). Array programming with NumPy. \textit{Nature, 585}(7825), 357--362. \url{https://doi.org/10.1038/s41586-020-2649-2}\par
+Hennessy, J. L., \& Patterson, D. A. (2019). \textit{Computer architecture: A quantitative approach} (6.ª ed.). Morgan Kaufmann.\par
+Hunter, J. D. (2007). Matplotlib: A 2D graphics environment. \textit{Computing in Science \& Engineering, 9}(3), 90--95. \url{https://doi.org/10.1109/MCSE.2007.55}\par
+Kimball, G., \& Wendt, D. (2024, 11 de septiembre). \textit{Scaling up to one billion rows of data in pandas using RAPIDS cuDF}. NVIDIA Technical Blog. \url{https://developer.nvidia.com/blog/processing-one-billion-rows-of-data-with-rapids-cudf-pandas-accelerator-mode/}\par
+McKinney, W. (2010). Data structures for statistical computing in Python. En \textit{Proceedings of the 9th Python in Science Conference} (pp. 56--61). \url{https://doi.org/10.25080/Majora-92bf1922-00a}\par
+Pedregosa, F., Varoquaux, G., Gramfort, A., Michel, V., Thirion, B., Grisel, O., et al. (2011). Scikit-learn: Machine learning in Python. \textit{Journal of Machine Learning Research, 12}, 2825--2830.\par
+RAPIDS. (2026). \textit{RAPIDS installation guide: Requisitos del sistema} [Documentación]. \url{https://docs.rapids.ai/install/}\par
+Seabold, S., \& Perktold, J. (2010). Statsmodels: Econometric and statistical modeling with Python. En \textit{Proceedings of the 9th Python in Science Conference} (pp. 92--96). \url{https://doi.org/10.25080/Majora-92bf1922-011}\par
+Universidad Tecnológica Metropolitana. (2019). \textit{Manual de estilo de publicaciones, Ediciones UTEM}. \url{https://editorial.utem.cl/wp-content/uploads/sites/3/2019/04/manual-estilo-publicaciones-ediciones-utem.pdf}\par
+Universidad Tecnológica Metropolitana. (2025). \textit{Manual de Identidad Visual UTEM}. \url{https://www.utem.cl/wp-content/uploads/2025/07/Manual_IVisual_UTEM_07_25.pdf}\par
+Virtanen, P., Gommers, R., Oliphant, T. E., Haberland, M., Reddy, T., Cournapeau, D., et al. (2020). SciPy 1.0: Fundamental algorithms for scientific computing in Python. \textit{Nature Methods, 17}, 261--272. \url{https://doi.org/10.1038/s41586-019-0686-2}\par
+Waskom, M. L. (2021). Seaborn: Statistical data visualization. \textit{Journal of Open Source Software, 6}(60), 3021. \url{https://doi.org/10.21105/joss.03021}\par
+
+}
 
 \appendix
 \section{Anexo A: Ejecución de Referencia (Prueba de Ejecución)}
 \label{sec:anexo}
-Este anexo reproduce \textbf{literalmente} la salida por pantalla de una ejecución completa del
+Este anexo reproduce \textit{literalmente} la salida por pantalla de una ejecución completa del
 programa, obtenida con \texttt{CPYD\_SEED=42 python3 main.py data/ventas\_completas.csv} en el
 equipo de la Tabla~\ref{tab:entorno} (Apple M4, planificador \texttt{threads}). Sirve de
 \textit{prueba de ejecución}: los números del informe son la salida real y reproducible del
@@ -776,10 +852,10 @@ la salida cruda se muestran cortadas con el símbolo $\hookrightarrow$ para no e
 
 \subsection*{Fase 1 --- Carga y Preprocesamiento (paralelo con Dask)}
 \textbf{Qué demuestra:} la semilla se fija desde \texttt{CPYD\_SEED}; el planificador activo es
-\texttt{threads} (10 \textit{workers}); las pruebas MCAR confirman \textbf{0\% de nulos reales}. Se
-computan en paralelo la frecuencia de \textbf{1.183.242 clientes}, la imputación de \textbf{2.876
-edades} inválidas (mediana 49,9) y los descriptivos; se materializan \textbf{3.242.878 filas} y se
-marcan \textbf{149.377 outliers} (IQR, 4,61\%). \texttt{UNIDADES} da asimetría/curtosis \texttt{NA}
+\texttt{threads} (10 \textit{workers}); las pruebas MCAR confirman \textit{0\% de nulos reales}. Se
+computan en paralelo la frecuencia de \textit{1.183.242 clientes}, la imputación de \textit{2.876
+edades} inválidas (mediana 49,9) y los descriptivos; se materializan \textit{3.242.878 filas} y se
+marcan \textit{149.377 outliers} (IQR, 4,61\%). \texttt{UNIDADES} da asimetría/curtosis \texttt{NA}
 por varianza cero (esperado).
 
 \begin{Verbatim}[breaklines=true,breakanywhere=true,fontsize=\scriptsize,breaksymbolleft={\tiny\ensuremath{\hookrightarrow}}]
@@ -854,7 +930,7 @@ Preprocesamiento finalizado.
 
 \subsection*{Fase 2 --- Análisis Exploratorio (EDA)}
 \textbf{Qué demuestra:} ninguna variable es normal (Shapiro/KS, $p\ll0{,}05$), justificando Spearman
-y pruebas no paramétricas. Con \textbf{tamaños de efecto}: V de Cramér(CANAL,LOCAL)$=0{,}577$ (grande,
+y pruebas no paramétricas. Con \textit{tamaños de efecto}: V de Cramér(CANAL,LOCAL)$=0{,}577$ (grande,
 por el confinamiento online$=$LOCAL 1999), pero $\eta^2$ de MONTO por CANAL ($0{,}0018$) y LOCAL
 ($0{,}0156$) son insignificante/pequeño: con $N=3{,}2$M todo es ``significativo'', pero la magnitud
 práctica es baja. Fechas especiales: $p=0{,}217$ (rango-biserial $-0{,}102$), sin pico estacional.
@@ -1011,7 +1087,7 @@ Hipótesis propia 3: el descuento promedio varía según el CANAL de compra.
 \textbf{Qué demuestra:} el modelo final \texttt{MONTO $\sim$ DESCUENTO + CANAL} (con \texttt{UNIDADES}
 y \texttt{LOCAL} excluidos y justificados). $R^2$ ajustado $=0{,}1645$ (train), $R^2$ de prueba
 $=0{,}1640$; RMSE $=13.220{,}88$; MAE $=6.291{,}93$. Diagnóstico: heterocedasticidad, no normalidad
-de residuos, independencia (Durbin-Watson $=1{,}999$) y \textbf{ausencia de multicolinealidad} (todos
+de residuos, independencia (Durbin-Watson $=1{,}999$) y \textit{ausencia de multicolinealidad} (todos
 los VIF $\approx 1{,}00$): la matriz de diseño ya no es singular tras las exclusiones.
 
 \begin{Verbatim}[breaklines=true,breakanywhere=true,fontsize=\scriptsize,breaksymbolleft={\tiny\ensuremath{\hookrightarrow}}]
@@ -1064,7 +1140,7 @@ Validación en el conjunto de prueba (30%):
 
 \subsection*{Cierre --- Tiempos por Fase}
 \textbf{Qué demuestra:} el planificador utilizado fue \texttt{threads} y el \textit{pipeline}
-completo se resolvió en \textbf{$\sim$19,7 s} (preprocesamiento $\sim$14,7 s, EDA $\sim$2,9 s,
+completo se resolvió en \textit{$\sim$19,7 s} (preprocesamiento $\sim$14,7 s, EDA $\sim$2,9 s,
 OLS $\sim$1,3 s). La diferencia con la Tabla~\ref{tab:fullpipe} ($\sim$18,4 s para \texttt{threads})
 es esperada: el arnés de \textit{benchmark} omite la generación de figuras para aislar el costo de
 cómputo, mientras que esta ejecución de referencia sí produce todos los gráficos.
