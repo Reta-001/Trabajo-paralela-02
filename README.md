@@ -12,7 +12,7 @@ pip install -r requirements.txt
 
 ## Datos de entrada
 
-Descargar el archivo desde el enlace indicado en `bitacora.md` y guardarlo en la carpeta `data/`. 
+Descargar el archivo `ventas_completas.csv` desde el enlace indicado en `data/README.md` y guardarlo en la carpeta `data/`.
 
 **Soporte Dual (.csv / .csv.gz):** El sistema está diseñado para ser transparente respecto a la compresión. Funciona exactamente igual si proporcionas el archivo original comprimido (`ventas_completas.csv.gz`) o si tu sistema operativo lo descomprimió automáticamente al descargarlo (`ventas_completas.csv`). El script detectará el formato y lo procesará en paralelo de todas formas.
 
@@ -28,7 +28,7 @@ python main.py data/ventas_completas.csv.gz
 python main.py data/ventas_completas.csv
 ```
 
-Si se omite el argumento, el sistema intentará buscar `data/ventas_completas.csv.gz` por defecto.
+Si se omite el argumento, el programa busca automáticamente `data/ventas_completas.csv` (o `.csv.gz`); si no encuentra ninguno, muestra un mensaje de uso claro y termina sin traza de error.
 
 ### Reproducibilidad
 
@@ -44,7 +44,7 @@ CPYD_SEED=42 python main.py data/ventas_completas.csv.gz
 El archivo se procesa con **Dask DataFrame** en modo de evaluación diferida (lazy). El
 planificador es configurable; el **valor por defecto es `threads`** (multihilo, memoria
 compartida), que resultó ser el más rápido y estable para esta carga *memory-bound* según la
-evaluación empírica documentada en el informe (`threads` 1,27×, `processes` 0,34× por sobrecosto
+evaluación empírica documentada en el informe (`threads` 1,27×, `processes` 0,32× por sobrecosto
 de IPC bajo `spawn`, `LocalCluster` óptimo en régimen estacionario). Optimizaciones aplicadas:
 
 - **Descompresión única en caché**: gzip no es divisible por bloques, por lo que el `.gz` se
@@ -66,6 +66,7 @@ de bajo consumo, y carga completa con pandas para conjuntos pequeños.
 ├── main.py                     # Orquestador: CLI, semilla, pipeline completo
 ├── requirements.txt
 ├── informe_tecnico.tex         # Informe técnico (LaTeX) con resultados e interpretaciones
+├── UTEM_logo_con_acronimo.png  # Identificador institucional UTEM (portada del informe)
 ├── benchmark.py                # Benchmark de planificadores: integridad, determinismo, sweep
 ├── benchmark_advanced.py       # LocalCluster vs processes + descomposición por sub-fase
 ├── sysinfo.py                  # Captura de hardware/entorno (reproducibilidad)
